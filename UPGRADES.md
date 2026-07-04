@@ -12,11 +12,13 @@ not a green checkmark. Severity: 🔴 dealbreaker · 🟠 clearly missing · �
    plays back smoothly and in real time. **Fix:** WebCodecs `VideoDecoder` with a decoded-frame queue
    (and audio-clock sync). This is the single biggest "doesn't feel real yet" gap.
 
-2. 🔴 **Audio — none of it.** No waveforms on the timeline, no audio in the preview, no audio in the
-   exported MP4. A video editor without sound is half an editor. **Fix:** Web Audio for preview
-   playback + waveform rendering; mux audio in the FFmpeg export (mix clips, apply volume/fades/
-   keyframes, respect trim/speed). Volume/fades already exist in the model and export to XMEML/FCPXML —
-   they just aren't *heard* yet.
+2. ✅ **Audio — DONE (core).** Waveforms render on audio clips (peak envelope ported from
+   `Audio/WaveformExtractor.swift`), the preview plays sound (Web Audio mix mirroring
+   `CompositionBuilder`'s per-clip trim/speed/volume/fades), and the FFmpeg export muxes a real audio
+   stream (verified −21 dB, not silence). Video+audio imports create a linked audio clip
+   (`placeClip`). **Remaining:** keyframed *volume* curves aren't mixed yet (static volume + fades are;
+   matches the FCPXML exporter's current limitation); scrubbing while playing doesn't re-sync the audio
+   clock; whole-file decode for preview (fine for now, streaming later); no audio meters/gain UI.
 
 3. 🟠 **Bring in your OWN media (UI).** The app ships real bundled demo media and the MCP `import_media`
    works, but the media panel's add/import flow for *your* files (file picker, drag-and-drop from

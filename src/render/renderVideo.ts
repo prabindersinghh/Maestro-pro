@@ -4,9 +4,11 @@
 
 import { createCanvas } from "@napi-rs/canvas";
 import { spawn } from "node:child_process";
+import { existsSync } from "node:fs";
 import { drawFrame } from "../compositor/draw";
 import { totalFrames } from "../model/helpers";
 import { NodeFrameSource } from "./nodeFrameSource";
+import { buildAudioMix, type AudioMixPlan } from "./audioMix";
 import type { Timeline } from "../model/types";
 
 export type VideoCodec = "H.264" | "H.265" | "ProRes";
@@ -43,17 +45,33 @@ export function renderSize(timeline: Timeline, resolution: VideoResolution): [nu
   return [even(timeline.width * scale), even(timeline.height * scale)];
 }
 
-function ffmpegArgs(codec: VideoCodec, fps: number, W: number, H: number, out: string): string[] {
-  const input = ["-y", "-f", "image2pipe", "-framerate", String(fps), "-s", `${W}x${H}`, "-i", "-"];
-  const rate = ["-r", String(fps)];
+function videoCodecArgs(codec: VideoCodec): string[] {
   switch (codec) {
     case "ProRes":
-      return [...input, ...rate, "-c:v", "prores_ks", "-profile:v", "3", "-pix_fmt", "yuv422p10le", out];
+      return ["-c:v", "prores_ks", "-profile:v", "3", "-pix_fmt", "yuv422p10le"];
     case "H.265":
-      return [...input, ...rate, "-c:v", "libx265", "-pix_fmt", "yuv420p", "-crf", "22", "-tag:v", "hvc1", out];
+      return ["-c:v", "libx265", "-pix_fmt", "yuv420p", "-crf", "22", "-tag:v", "hvc1"];
     default:
-      return [...input, ...rate, "-c:v", "libx264", "-pix_fmt", "yuv420p", "-crf", "18", "-preset", "medium", "-movflags", "+faststart", out];
+      return ["-c:v", "libx264", "-pix_fmt", "yuv420p", "-crf", "18", "-preset", "medium", "-movflags", "+faststart"];
   }
+}
+
+function ffmpegArgs(
+  codec: VideoCodec, fps: number, W: number, H: number, out: string,
+  audio: AudioMixPlan | null, durationSec: number,
+): string[] {
+  const args = ["-y", "-f", "image2pipe", "-framerate", String(fps), "-s", `${W}x${H}`, "-i", "-"];
+  if (audio) for (const p of audio.inputs) args.push("-i", p);
+  args.push("-r", String(fps), ...videoCodecArgs(codec));
+  if (audio) {
+    // mov (ProRes) → pcm; mp4 (H.264/H.265) → aac.
+    const acodec = codec === "ProRes" ? ["-c:a", "pcm_s16le"] : ["-c:a", "aac", "-b:a", "192k"];
+    args.push("-filter_complex", audio.filterComplex, "-map", "0:v", "-map", "[aout]", ...acodec, "-t", durationSec.toFixed(3));
+  } else {
+    args.push("-map", "0:v");
+  }
+  args.push(out);
+  return args;
 }
 
 export async function renderVideo(timeline: Timeline, opts: RenderOptions): Promise<RenderResult> {
@@ -70,7 +88,14 @@ export async function renderVideo(timeline: Timeline, opts: RenderOptions): Prom
   const frameSource = opts.mediaPath ? new NodeFrameSource(opts.mediaPath, fps, opts.ffmpegPath) : undefined;
   if (frameSource) await frameSource.prepare(timeline);
 
-  const ff = spawn(opts.ffmpegPath ?? "ffmpeg", ffmpegArgs(codec, fps, W, H, opts.outputPath), {
+  // Audio mix (unmuted audio clips → per-clip trim/speed/volume/fades → amix). Only real on-disk
+  // inputs are included, so a missing/offline source silently drops out instead of failing ffmpeg.
+  const audioResolve = opts.mediaPath;
+  const audio = audioResolve
+    ? buildAudioMix(timeline, (ref) => { const p = audioResolve(ref); return p && existsSync(p) ? p : null; })
+    : null;
+
+  const ff = spawn(opts.ffmpegPath ?? "ffmpeg", ffmpegArgs(codec, fps, W, H, opts.outputPath, audio, total / fps), {
     stdio: ["pipe", "ignore", "pipe"],
   });
   let stderr = "";

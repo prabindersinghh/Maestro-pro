@@ -23,11 +23,11 @@ export function demoProject(): { timeline: Timeline; media: MediaLibrary } {
   // Real bundled media (public/ → served in dev + Tauri, on disk for the render).
   media.addAsset({ id: "a-video", name: "Sample Clip.mp4", type: "video", duration: 6, source: { kind: "external", absolutePath: "/sample-video.mp4" }, sourceWidth: 640, sourceHeight: 360, sourceFPS: 30, hasAudio: false });
   media.addAsset({ id: "a-image", name: "Logo.png", type: "image", duration: 6, source: { kind: "external", absolutePath: "/sample-image.png" }, sourceWidth: 600, sourceHeight: 600 });
-  media.addAsset({ id: "a-music", name: "Music Bed.mp3", type: "audio", duration: 12, source: { kind: "project", relativePath: "music.mp3" }, hasAudio: true });
+  media.addAsset({ id: "a-music", name: "Music Bed.m4a", type: "audio", duration: 12, source: { kind: "external", absolutePath: "/sample-audio.m4a" }, hasAudio: true });
 
   // Title (text) — top track.
   const title = clip({ id: "c-title", mediaRef: "text-title", start: 0, dur: 150, mediaType: "text" });
-  title.textContent = "Palmier Pro";
+  title.textContent = "Maestro";
   title.textStyle = { ...defaultTextStyle(), fontSize: 84 };
   title.transform = { centerX: 0.5, centerY: 0.82, width: 0.9, height: 0.2, rotation: 0, flipHorizontal: false, flipVertical: false };
 

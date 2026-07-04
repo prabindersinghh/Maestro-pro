@@ -4,6 +4,7 @@ import { theme, clipColor } from "../theme";
 import { TimelineGeometry } from "./geometry";
 import { collectTargets, findSnap, newSnapState, type SnapState } from "./snap";
 import { isCompatible } from "../../model";
+import { WaveformStrip } from "./waveform";
 import type { Clip } from "../../model/types";
 
 const { rulerHeight, dropZoneHeight, trackHeight, headerWidth } = theme.timeline;
@@ -248,21 +249,25 @@ function ClipView(props: {
 }) {
   const { clip, rect, selected, dim } = props;
   const color = clipColor(clip.mediaType);
-  const label = clip.mediaType === "text" ? clip.textContent || "Text" : clip.mediaRef;
+  const label = clip.mediaType === "text"
+    ? clip.textContent || "Text"
+    : store.media.asset(clip.mediaRef)?.name ?? clip.mediaRef;
+  const w = Math.max(2, rect.width);
   return (
     <div
       onPointerDown={props.onPointerDown}
       onPointerMove={props.onPointerMove}
       onPointerUp={props.onPointerUp}
       style={{
-        position: "absolute", left: rect.x, top: rect.y, width: Math.max(2, rect.width), height: rect.height,
+        position: "absolute", left: rect.x, top: rect.y, width: w, height: rect.height,
         background: `linear-gradient(180deg, ${color}, ${color}cc)`,
         border: selected ? `2px solid ${theme.color.selection}` : `1px solid rgba(0,0,0,0.35)`,
         borderRadius: theme.timeline.clipRadius, boxSizing: "border-box", overflow: "hidden",
         cursor: "grab", opacity: dim ? 0.6 : 1, boxShadow: "0 1px 2px rgba(0,0,0,0.3)",
       }}
     >
-      <div style={{ fontSize: 11, color: "rgba(255,255,255,0.95)", padding: "3px 6px", whiteSpace: "nowrap", textShadow: "0 1px 1px rgba(0,0,0,0.5)" }}>
+      {clip.mediaType === "audio" && <WaveformStrip clip={clip} fps={store.timeline.fps} width={w} height={rect.height} />}
+      <div style={{ position: "relative", fontSize: 11, color: "rgba(255,255,255,0.95)", padding: "3px 6px", whiteSpace: "nowrap", textShadow: "0 1px 2px rgba(0,0,0,0.7)" }}>
         {label}
       </div>
     </div>

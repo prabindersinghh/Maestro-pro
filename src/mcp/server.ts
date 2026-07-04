@@ -102,6 +102,10 @@ export class McpServer {
     if (path.startsWith("/media/") && req.method === "GET") {
       return this.serveMedia(req, res, decodeURIComponent(path.slice("/media/".length)));
     }
+    if (path.startsWith("/waveform/") && req.method === "GET") {
+      const wf = await this.executor.waveformFor(decodeURIComponent(path.slice("/waveform/".length)));
+      return sendJson(res, 200, wf, CORS);
+    }
 
     if (path !== "/mcp" && path !== "/") {
       res.writeHead(404).end();

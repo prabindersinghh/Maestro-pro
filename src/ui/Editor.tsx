@@ -6,6 +6,7 @@ import { CanvasPreview } from "../compositor/CanvasPreview";
 import { Inspector } from "./Inspector";
 import { MediaPanel } from "./MediaPanel";
 import { exportVideoFromUI } from "./exportVideo";
+import { previewAudio } from "../audio/previewAudio";
 
 function frameToTimecode(frame: number, fps: number): string {
   const f = frame % fps;
@@ -48,10 +49,11 @@ export function Editor() {
     }
   };
 
-  // Playback loop — advances currentFrame at fps while playing.
+  // Playback loop — advances currentFrame at fps while playing, and drives preview audio.
   useEffect(() => {
     if (!playing) return;
     floatFrame.current = store.view.currentFrame;
+    void previewAudio.play(store.timeline, Math.round(store.view.currentFrame), (r) => store.mediaSrcFor(r));
     let raf = 0;
     let last = performance.now();
     const tick = (now: number) => {
@@ -68,7 +70,10 @@ export function Editor() {
       raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
+    return () => {
+      cancelAnimationFrame(raf);
+      previewAudio.stop();
+    };
   }, [playing, timeline.fps]);
 
   // Space toggles play/pause.

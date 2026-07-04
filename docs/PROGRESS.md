@@ -493,4 +493,86 @@ Also rewrote **UPGRADES.md** into an honest, severity-ranked "gap to real Palmie
 
 ---
 
+## Entry — 2026-07-03 · THE REAL USER LOOP + Maestro rename + GitHub push
+
+### Architecture change: shared project state (the fix for "app and Claude edit different projects")
+The MCP server is now the **project backend**. New pieces (all `palmier-win/`):
+- `src/mcp/probe.ts` — ffprobe metadata on import (mirrors `MediaAsset.loadMetadata` in
+  `Models/MediaAsset.swift`: duration/dimensions/fps/hasAudio).
+- `src/mcp/executor.ts` — `stateVersion`, `getState()/setState()`, `importFromPath()` (real metadata);
+  `import_media` path-mode now probes.
+- `src/mcp/server.ts` — bridge endpoints (NOT part of the frozen MCP contract): `GET/POST /state`,
+  `POST /upload` (file bytes → disk → probe → register), `GET /media/:id` (streams bytes with Range +
+  CORS — the preview's media source; replaces the broken convertFileSrc approach).
+- `src/state/bridge.ts` + `store.ts` — live sync: local edits push (300ms debounce), Claude's edits
+  arrive via 1s poll; `mediaSrcFor` (objectURL → served path → bridge stream); connection dot in UI.
+- `src/ui/MediaPanel.tsx` — **＋ Import** (Tauri file dialog / browser input); `Editor.tsx` — window
+  drag-drop (browser Files + Tauri native paths via `onDragDropEvent`).
+- `src-tauri/` — `tauri-plugin-dialog`, `capabilities/default.json` (core/dialog/fs), auto-spawn of
+  the project server on app start. **`cargo check` passed.**
+- Store zone routing: video prefers a `video` track (matches `EditorViewModel+Linking` zones).
+
+### THE LOOP — verified in the RUNNING app (not the harness), every step pixel-checked
+1. **Import own file via the real UI:** clicked ＋ Import → real file chooser → `my-vacation.mp4`
+   (external red→green test file) → uploaded, probed (**4s, 480×270, 30fps**), in the media panel.
+2. **True pixels in preview:** clicked the asset → placed on a video track → preview showed
+   **rgb(254,0,0)** (red half) and **rgb(0,255,1)** (green half), frame-accurate.
+3. **Claude edits the SAME project over MCP:** `ripple_delete_ranges` cut the red half → the app
+   picked it up automatically (clip → trim 60/dur 60; preview at clip start turned GREEN).
+4. **Export contains the user's footage:** MCP `export_project` → H.264 1280×720 8s; at the user
+   clip's position the output reads **rgb(0,252,0)**.
+`npm test` 127/127 · `tsc` clean · cargo check clean.
+
+### Maestro rename + GitHub
+Product renamed **Maestro** (UI title, window title, productName, identifier `io.maestro.editor`,
+package name). **MCP identity `palmier-pro` + `.palmier` format intentionally kept** (frozen contract
+compat; documented in README). New README (Maestro branding, Palmier GPLv3 credit, quickstart, MCP
+guide, honest gaps). Repo initialized from `palmier-win/` (docs/SPEC.md + docs/PROGRESS.md snapshots
+included) and **pushed: https://github.com/prabindersinghh/Maestro-pro (main, 154 files)**.
+
+### Protocol going forward (user directive)
+Port faithfully from the Palmier source (file-cited), verify LIVE in the app with the user's own file,
+then STOP for the user's live confirmation before the next piece. Order: ① real media import (DONE —
+awaiting user confirmation) → ② audio (`Audio/`, waveforms/preview/export-mix) → ③ smooth playback
+(port Palmier's preview approach; WebCodecs for AVFoundation) → ④ full MCP loop on user media (DONE
+as part of ①) → ⑤ exact color/effects (`Compositing/` kernels), transitions, timeline power tools.
+
+---
+
+## Entry — 2026-07-04 · ② AUDIO (waveforms + preview sound + audio in export)
+
+Ported from `Audio/WaveformExtractor.swift`, `Audio/AudioEnvelope.swift`, and
+`Preview/CompositionBuilder.swift` (audio-mix section) + `EditorViewModel.placeClip`.
+- `src/audio/waveform.ts` — peak envelope via ffmpeg f32 PCM, same contract (200 s/s, −50 dB floor,
+  0=loud/1=silence, 240k cap).
+- `src/render/audioMix.ts` — export mix as an ffmpeg filter graph: per audio clip
+  `atrim → atempo(speed) → volume → afade in/out → adelay`, then `amix=normalize=0`. Wired into
+  `renderVideo` single-pass (video from stdin = input 0, audio files = inputs 1..N; aac for mp4, pcm
+  for mov; `-t` bounds to video). Offline/missing inputs dropped via existsSync.
+- `src/audio/previewAudio.ts` — Web Audio equivalent of the AVMutableAudioMix: decode per asset,
+  schedule BufferSource+Gain per clip with trim offset, playbackRate=speed, static volume + linear
+  head/tail fade ramps, aligned to the playhead. Hooked into the Editor play/pause effect.
+- `placeClip` linked-audio ported into `store.addMediaToTimeline`: a **video with audio** on a video
+  track now creates a `linkGroupId` video clip + a linked **audio clip** on a resolved/created audio
+  track — so the user's imported video's sound reaches the audio-only mix (both preview & export).
+  `resolveOrCreateAudioTrack` ported.
+- Server bridge: `GET /waveform/:id` (executor caches peak envelopes; no-cache on unresolved asset so
+  it retries after the UI seeds state). Timeline draws `WaveformStrip` on audio clips; clip labels now
+  show the asset name.
+- Demo ships a real audio bed (`public/sample-audio.m4a`); demo title text → "Maestro".
+
+### Gate — verified against the ACTUAL running app (Playwright, real files, screenshot in repo)
+- **Waveform visible:** `docs/screenshots/02-audio-waveform.png` shows the peaks drawn on the A1 clip;
+  programmatic check = 1500×57 canvas, ~49k opaque px; server `/waveform/a-music` = 2401 peaks.
+- **Preview audio graph runs:** real Play click → `activeSources:1`, AudioContext `running`, clock
+  advancing in real time. (Audibility is checkpoint (a) — user listens.)
+- **Export audio:** linked-audio project → output has an **aac** stream at **−21 dB mean / −17.7 dB
+  max** (not the ~−91 dB of silence), via `volumedetect`.
+- `npm test` **136/136** (+9 audioMix), `tsc` clean, build OK.
+
+> ⏸️ **CHECKPOINT (a): user listens.** Per protocol, stopping here for Prabinder to confirm preview
+> sound + exported-file sound by ear before ③ smooth playback.
+
+---
+
 <!-- Append the next session's entry below this line. Keep newest at the bottom or top consistently. -->

@@ -16,6 +16,7 @@ import { resolveRenderMediaPath } from "../render/mediaPath";
 import { encodeTimeline, decodeTimeline } from "../model/codec";
 import { encodeManifest, decodeManifest } from "../model/media";
 import { probeMedia } from "./probe";
+import { extractWaveform, type WaveformEnvelope } from "../audio/waveform";
 import { join } from "node:path";
 import type { VideoCodec, VideoResolution } from "../render/renderVideo";
 
@@ -66,6 +67,25 @@ export class McpExecutor {
 
   /** Bumped on every state mutation (edits, media, setState) — drives the UI sync bridge. */
   stateVersion = 0;
+
+  private waveforms = new Map<string, WaveformEnvelope>();
+  private waveformJobs = new Map<string, Promise<WaveformEnvelope>>();
+
+  /** Peak-envelope waveform for an asset (cached; computed on first request). Empty if no audio. */
+  waveformFor(mediaRef: string): Promise<WaveformEnvelope> {
+    const cached = this.waveforms.get(mediaRef);
+    if (cached) return Promise.resolve(cached);
+    const asset = this.media.asset(mediaRef);
+    const path = asset ? resolveRenderMediaPath(asset.source, this.projectDir ?? ".", join(process.cwd(), "public")) : null;
+    // Asset not resolvable yet (state not seeded) — return empty WITHOUT caching, so it retries later.
+    if (!path) return Promise.resolve({ samplesPerSecond: 200, peaks: [] });
+    let job = this.waveformJobs.get(mediaRef);
+    if (!job) {
+      job = extractWaveform(path, asset?.duration ?? 0).then((wf) => { this.waveforms.set(mediaRef, wf); return wf; });
+      this.waveformJobs.set(mediaRef, job);
+    }
+    return job;
+  }
 
   getState(): { version: number; timeline: unknown; media: unknown; projectDir: string | null } {
     return {

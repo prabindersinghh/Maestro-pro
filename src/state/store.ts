@@ -2,7 +2,7 @@
 // useSyncExternalStore. All timeline mutations go through the engine (one engine, two front-ends).
 
 import { useSyncExternalStore } from "react";
-import { EditEngine } from "../engine/editEngine";
+import { EditEngine, type PlaceSpec } from "../engine/editEngine";
 import { MediaLibrary } from "../mcp/mediaLibrary";
 import { clampZoom } from "../ui/timeline/geometry";
 import { theme } from "../ui/theme";
@@ -248,25 +248,52 @@ export class EditorStore {
   }
 
   /** Add a media asset as a clip at the playhead (create/target a compatible track). */
+  /** Find an audio track whose [start,end) is free, else create one at the bottom (resolveOrCreateAudioTrack). */
+  private resolveOrCreateAudioTrack(startFrame: number, duration: number): number {
+    const end = startFrame + duration;
+    const free = this.timeline.tracks.findIndex(
+      (t) => t.type === "audio" && !t.clips.some((c) => c.startFrame < end && endFrame(c) > startFrame),
+    );
+    if (free >= 0) return free;
+    this.engine.timeline.tracks.push({
+      id: `t-${Date.now()}`, type: "audio", muted: false, hidden: false, syncLocked: true, clips: [],
+    });
+    return this.timeline.tracks.length - 1;
+  }
+
+  // placeClip (EditorViewModel.swift): a video with audio dropped on a video track creates a
+  // linkGroupId'd video clip PLUS a linked audio clip on an audio track, so it moves/exports as one.
   addMediaToTimeline(assetId: string): void {
     const asset = this.media.asset(assetId);
     if (!asset) return;
     const want = asset.type === "audio" ? "audio" : "video";
-    // Prefer an exact-type track (zone routing), then any compatible visual track.
     let trackIndex = this.timeline.tracks.findIndex((t) => t.type === asset.type);
     if (trackIndex < 0) trackIndex = this.timeline.tracks.findIndex((t) => (want === "audio" ? t.type === "audio" : isVisual(t.type)));
     if (trackIndex < 0) {
-      // create a track of the needed type
       this.engine.timeline.tracks[want === "audio" ? "push" : "unshift"]({
         id: `t-${Date.now()}`, type: want, muted: false, hidden: false, syncLocked: true, clips: [],
       });
       trackIndex = want === "audio" ? this.timeline.tracks.length - 1 : 0;
     }
+    const start = this.view.currentFrame;
     const dur = Math.max(1, Math.round(asset.duration * this.timeline.fps));
-    this.engine.addClips([{
-      mediaRef: assetId, trackIndex, startFrame: this.view.currentFrame, durationFrames: dur,
+
+    const targetIsVideo = this.timeline.tracks[trackIndex].type === "video";
+    const shouldLink = targetIsVideo && asset.type === "video" && asset.hasAudio === true;
+    const specs: PlaceSpec[] = [{
+      mediaRef: assetId, trackIndex, startFrame: start, durationFrames: dur,
       mediaType: asset.type, sourceClipType: asset.type,
-    }]);
+    }];
+    if (shouldLink) {
+      const linkGroupId = `lg-${Date.now()}`;
+      specs[0].linkGroupId = linkGroupId;
+      const audioTrackIndex = this.resolveOrCreateAudioTrack(start, dur);
+      specs.push({
+        mediaRef: assetId, trackIndex: audioTrackIndex, startFrame: start, durationFrames: dur,
+        mediaType: "audio", sourceClipType: asset.type, linkGroupId,
+      });
+    }
+    this.engine.addClips(specs);
     this.emit();
   }
 }
