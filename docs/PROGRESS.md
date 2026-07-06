@@ -671,4 +671,38 @@ order, each verified LIVE in the running app (Playwright + screenshots in docs/s
 
 ---
 
+## Entry — 2026-07-06 · STRATEGY ① video-use + captions #5 — the transcript-editing loop, live
+
+User provided the ElevenLabs key. Ran the whole loop end-to-end on a real speech clip and it works:
+- **Key**: written to `~/Developer/video-use/.env` (chmod 600, never echoed/committed); auth check → 200.
+- **Test clip**: generated a 20s talking-head with real speech + filler words ("So, um … uh …") via
+  Windows SAPI TTS muxed onto a color bg (`~/Developer/video-use-test/my-talkinghead.mp4`).
+- **Transcribe**: `transcribe.py` → ElevenLabs Scribe → **65 words** with timings; fillers located
+  ("um" 0.96–1.14s, "uh" 4.94–5.00s, "um" 10.88–11.04s, "uh" 11.26–11.42s).
+- **Filler removal**: built an EDL keeping everything except the filler intervals → `render.py`
+  → `final.mp4` **19.93s → 19.56s**, loudness-normalized to −14 LUFS.
+- **Import + captions in Maestro** (`scratchpad/captions-loop.mjs`): `import_media(final.mp4)` →
+  `add_clips` → **11 caption chunks** derived from the transcript (fillers dropped, timings remapped
+  past the cuts) added via `add_texts`. Verified live: preview shows **"welcome to Maestro." (white)
+  overlaid on the video**; timeline = caption track (T1) over cleaned video (V1) over audio (A1).
+  `docs/screenshots/11-videouse-captions.png`.
+
+**Maestro fixes this surfaced (committed):** `add_texts` now (a) routes text to a **dedicated text
+track** (`ensureTextTrack`) instead of overwriting the video track, and (b) sets a **default textStyle
++ lower-third transform** so captions actually render (drawText needs both). These make captions a real
+feature, not just clips.
+
+**Honest notes on video-use (MIT):** two Windows path bugs in the repo — `grade.py` auto-grade and the
+subtitle-burn both pass `C:\…` paths into ffmpeg filter strings, whose `:`/`\` break the filter parser.
+Worked around by `grade:null` + `--no-subtitles` and doing **captions in Maestro** instead (better
+anyway — editable text clips vs burned-in). Fixing video-use's Windows paths is a small upstream patch
+(worth a PR). Cost: one short Scribe call (~20s clip).
+
+136 tests green, tsc clean.
+
+> ✅ The #1 edge over Palmier — transcript-based smart editing — is live end-to-end: talking-head →
+> Scribe → filler cut → cleaned clip + captions on Maestro's timeline, all Claude-drivable over MCP.
+
+---
+
 <!-- Append the next session's entry below this line. Keep newest at the bottom or top consistently. -->

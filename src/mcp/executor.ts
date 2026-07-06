@@ -5,7 +5,7 @@
 import type { AnimatableProperty, ClipType } from "../model/enums";
 import { isVisual } from "../model/enums";
 import type { AnimPair, Crop, Keyframe, KeyframeValue, Timeline } from "../model/types";
-import { defaultTrack, defaultClip } from "../model/defaults";
+import { defaultTrack, defaultClip, defaultTextStyle } from "../model/defaults";
 import { LAYOUTS, LAYOUT_NAMES, layoutPlacement, type LayoutFit, type LayoutSlot } from "../model/layout";
 import { EditEngine, type InsertSpec, type MoveSpec, type PlaceSpec } from "../engine/editEngine";
 import { buildGetTimelineOutput } from "./getTimelineOutput";
@@ -251,6 +251,14 @@ export class McpExecutor {
       return this.timeline.tracks.length - 1;
     }
     this.timeline.tracks.unshift(defaultTrack(type));
+    return 0;
+  }
+
+  /** Text/captions get a DEDICATED text track (above visuals) so they overlay video, not overwrite it. */
+  private ensureTextTrack(): number {
+    const existing = this.timeline.tracks.findIndex((t) => t.type === "text");
+    if (existing >= 0) return existing;
+    this.timeline.tracks.unshift(defaultTrack("text"));
     return 0;
   }
 
@@ -585,16 +593,20 @@ export class McpExecutor {
       if (startFrame === undefined || durationFrames === undefined || content === undefined) {
         throw new ToolFail("add_texts: each entry needs startFrame, durationFrames, content");
       }
-      const trackIndex = allSpecify ? aInt(e, "trackIndex")! : this.ensureTrack("text");
+      const trackIndex = allSpecify ? aInt(e, "trackIndex")! : this.ensureTextTrack();
       const id = cryptoId();
       specs.push({ mediaRef: `text-${id}`, trackIndex, startFrame, durationFrames, mediaType: "text", sourceClipType: "text", id });
       contents.push(content);
     }
     const changed = this.engine.addClips(specs);
-    // Attach text content post-place.
+    // Attach text content + a default style/placement so it renders (drawText needs both).
     specs.forEach((s, i) => {
       const c = this.engine.clipRef(s.id!);
-      if (c) c.textContent = contents[i];
+      if (!c) return;
+      c.textContent = contents[i];
+      c.textStyle ??= defaultTextStyle();
+      // Caption-friendly default: lower third, centered.
+      c.transform = { centerX: 0.5, centerY: 0.82, width: 0.9, height: 0.2, rotation: 0, flipHorizontal: false, flipVertical: false };
     });
     this.track(changed, "Add Text");
     return okJson({ added: specs.length, clipIds: specs.map((s) => s.id) });
