@@ -612,4 +612,34 @@ button/S), transitions, live trim preview while dragging. ③ smooth playback (W
 
 ---
 
+## Entry — 2026-07-05 · Smooth playback + MCP tools (apply_layout, Skills) + STRATEGY + video-use setup
+
+- **③ Smooth playback** (Preview/VideoEngine analog): real-time `<video>` playback + a dedicated
+  60fps canvas draw loop in CanvasPreview; playhead emit throttled to ~20/s. tsc/build/136 tests green.
+  **Live visual smoothness NOT yet verified** — Playwright MCP was disconnected this session. Code is
+  committed; needs an eyeball (the running app reflects it via HMR).
+- **apply_layout WIRED** (was stubbed): ported VideoLayout slots + cover-crop solver
+  (`src/model/layout.ts`). **Verified live over MCP**: side_by_side → correct transforms/crops.
+- **Skills system** (Agent/Skills port): `src/mcp/skills.ts` fetches the real palmier-io/palmier-skills
+  catalog + bodies; `read_skill` + `list_skills` exposed over MCP (43 advertised = frozen 41 + 2
+  extensions); skills catalog injected into initialize instructions. **Verified live**:
+  `read_skill('color-grading')` → real 8,474-char body; `list_skills` → 4 skills.
+- **MCP tools audit** written: `docs/MCP-TOOLS.md` (27 fully wired · partials · stubs · signed-out),
+  each claim backed by a live tool result. Also live-verified this session: set_keyframes, update_text,
+  add_texts.
+- **docs/STRATEGY.md** written: the open-tooling plan (transcript editing → motion graphics → free
+  generation), integration seam = `import_media`, build order ①–⑤, license ledger.
+- **STRATEGY ① video-use** (MIT, transcript editing) INSTALLED: cloned to `~/Developer/video-use`,
+  `uv sync` done, symlinked into `~/.claude/skills/video-use`, helpers verified
+  (`transcribe.py --help` OK, ffprobe OK). **BLOCKED on the user's ElevenLabs API key** (write to
+  `~/Developer/video-use/.env`) before the live end-to-end test. Seam: video-use → `final.mp4` →
+  Maestro `import_media`.
+
+Prereqs confirmed on this machine: Python 3.11, uv 0.10, ffmpeg 8.0, node 22, git.
+
+> ⏸️ Awaiting: (a) ElevenLabs key to finish ① live; (b) an eyeball on smooth playback (Playwright was
+> down). Everything else this session is verified live over MCP.
+
+---
+
 <!-- Append the next session's entry below this line. Keep newest at the bottom or top consistently. -->
