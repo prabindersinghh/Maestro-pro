@@ -7,7 +7,7 @@ import { createReadStream } from "node:fs";
 import { stat, mkdir, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { extname, join } from "node:path";
-import { TOOL_DEFS } from "./toolDefs";
+import { ALL_TOOL_DEFS } from "./toolDefs";
 import { resolveRenderMediaPath } from "../render/mediaPath";
 import type { McpExecutor } from "./executor";
 
@@ -199,11 +199,12 @@ export class McpServer {
       switch (method) {
         case "initialize": {
           const requested = typeof params.protocolVersion === "string" ? params.protocolVersion : DEFAULT_PROTOCOL;
+          const skillBlock = await this.executor.skills.promptBlock().catch(() => "");
           return rpcOk(id, {
             protocolVersion: SUPPORTED_PROTOCOLS.has(requested) ? requested : DEFAULT_PROTOCOL,
             capabilities: { tools: { listChanged: false }, resources: { subscribe: false, listChanged: false } },
             serverInfo: SERVER_INFO,
-            instructions: SERVER_INSTRUCTIONS,
+            instructions: skillBlock ? `${SERVER_INSTRUCTIONS}\n\n${skillBlock}` : SERVER_INSTRUCTIONS,
           });
         }
         case "notifications/initialized":
@@ -212,7 +213,7 @@ export class McpServer {
         case "ping":
           return rpcOk(id, {});
         case "tools/list":
-          return rpcOk(id, { tools: TOOL_DEFS });
+          return rpcOk(id, { tools: ALL_TOOL_DEFS });
         case "tools/call": {
           const name = String(params.name ?? "");
           const args = (params.arguments as Record<string, unknown>) ?? {};

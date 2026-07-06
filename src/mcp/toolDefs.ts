@@ -701,4 +701,23 @@ if (TOOL_DEFS.length !== 41) {
   throw new Error(`Expected 41 MCP tools (frozen contract), got ${TOOL_DEFS.length}`);
 }
 
+// Maestro extension tools — NOT part of the frozen 41-tool parity contract. The Skills system is
+// ported from Palmier's in-app agent (Agent/Skills), which itself adds read_skill on top of the 41
+// MCP tools. Exposed here so Claude Code over MCP can load Palmier's editing playbooks.
+export const SKILL_TOOL_DEFS: ToolDef[] = [
+  {
+    name: "list_skills",
+    description: "List available editing skills (playbooks) with their ids and descriptions. A skill is a step-by-step pro workflow (e.g. color-grading, ugc-editing). Call this to discover skills, then read_skill(id) to load one before a matching task.",
+    inputSchema: obj({}, []),
+  },
+  {
+    name: "read_skill",
+    description: "Load an editing skill's full step-by-step workflow by id (from list_skills). Read and follow it before doing a task it covers — it teaches how to use the editing tools like a professional, not literally.",
+    inputSchema: obj({ id: str("The skill id, e.g. 'color-grading' or 'ugc-editing'.") }, ["id"]),
+  },
+];
+
+/** Tools advertised over MCP: the frozen 41 plus the Skills extension. */
+export const ALL_TOOL_DEFS: ToolDef[] = [...TOOL_DEFS, ...SKILL_TOOL_DEFS];
+
 export const TOOL_NAMES = TOOL_DEFS.map((t) => t.name);

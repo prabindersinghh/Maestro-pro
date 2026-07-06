@@ -1,7 +1,9 @@
-// Browser frame source: real decoded pixels for the live preview. Still images decode via
-// createImageBitmap; video clips use a <video> element seeked to the clip's source time (drawable
-// once 'seeked' fires). Not-ready frames return null (compositor draws a tile) and trigger a
-// re-render when they load. Smooth per-frame video decode (WebCodecs) is an UPGRADES item.
+// Browser frame source: real decoded pixels for the live preview.
+//  - Still images decode via createImageBitmap.
+//  - Video clips use a <video> element. Paused = seek to the clip's source time (frame-accurate
+//    scrubbing). Playing = the element plays in REAL TIME (native decode, the web analog of
+//    AVPlayer in Preview/VideoEngine.swift) and its live frame is drawn every animation frame —
+//    no per-frame seeking, so playback is smooth. Drift beyond a threshold is nudged back.
 
 import type { Clip } from "../model/types";
 import { type FrameImage, type FrameSource, sourceConsumedIndex } from "./frameSource";
@@ -17,12 +19,36 @@ export class BrowserFrameSource implements FrameSource {
   private bitmaps = new Map<string, FrameImage>();
   private loadingImg = new Set<string>();
   private videos = new Map<string, VideoState>();
+  private playing = false;
+  private touched = new Set<string>();
 
   constructor(
     private readonly srcFor: (mediaRef: string) => string | null,
     private readonly fps: number,
     private readonly onReady: () => void,
   ) {}
+
+  /** Enter/leave real-time playback. On stop, pause every element. */
+  setPlaying(playing: boolean): void {
+    this.playing = playing;
+    if (!playing) for (const v of this.videos.values()) { try { v.el.pause(); } catch { /* ignore */ } }
+  }
+
+  /** Diagnostics for live verification: playback state + each video element's real-time clock. */
+  get diagnostics(): { playing: boolean; videos: { paused: boolean; currentTime: number; rate: number; w: number }[] } {
+    return {
+      playing: this.playing,
+      videos: [...this.videos.values()].map((v) => ({ paused: v.el.paused, currentTime: v.el.currentTime, rate: v.el.playbackRate, w: v.el.videoWidth })),
+    };
+  }
+
+  /** After compositing a frame, pause any video that wasn't drawn (playhead left the clip). */
+  sweep(): void {
+    if (this.playing) {
+      for (const [ref, v] of this.videos) if (!this.touched.has(ref) && !v.el.paused) { try { v.el.pause(); } catch { /* ignore */ } }
+    }
+    this.touched.clear();
+  }
 
   imageFor(clip: Clip, frame: number): FrameImage | null {
     const src = this.srcFor(clip.mediaRef);
@@ -61,6 +87,7 @@ export class BrowserFrameSource implements FrameSource {
       el.muted = true;
       el.preload = "auto";
       el.crossOrigin = "anonymous";
+      el.playsInline = true;
       el.src = src;
       v = { el, ready: false, seekedTime: -1, wantTime: -1 };
       const state = v;
@@ -72,6 +99,22 @@ export class BrowserFrameSource implements FrameSource {
     }
     if (!v.ready || v.el.videoWidth === 0) return null;
     const t = this.timeFor(clip, frame);
+    this.touched.add(clip.mediaRef);
+
+    if (this.playing) {
+      const rate = clip.speed > 0 ? clip.speed : 1;
+      if (v.el.paused) {
+        try { v.el.currentTime = t; } catch { /* not seekable yet */ }
+        v.el.playbackRate = rate;
+        void v.el.play().catch(() => undefined);
+      } else {
+        if (Math.abs(v.el.currentTime - t) > 0.25) { try { v.el.currentTime = t; } catch { /* ignore */ } }
+        if (v.el.playbackRate !== rate) v.el.playbackRate = rate;
+      }
+      return { image: v.el, width: v.el.videoWidth, height: v.el.videoHeight }; // live frame — smooth
+    }
+
+    // Paused: frame-accurate seek for scrubbing.
     if (Math.abs(v.seekedTime - t) <= 1 / this.fps) {
       return { image: v.el, width: v.el.videoWidth, height: v.el.videoHeight };
     }

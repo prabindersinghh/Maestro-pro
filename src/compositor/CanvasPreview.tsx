@@ -15,26 +15,51 @@ export function CanvasPreview() {
       store.timeline.fps,
       forceRender,
     );
+    if (import.meta.env.DEV) (globalThis as unknown as { frameSource?: BrowserFrameSource }).frameSource = fsRef.current;
   }
 
   const { timeline } = store;
   const W = timeline.width;
   const H = timeline.height;
   const frame = store.view.currentFrame;
+  const playing = store.view.playing;
 
-  useEffect(() => {
+  const paint = (f: number) => {
     const canvas = ref.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-    canvas.width = W;
-    canvas.height = H;
-    drawFrame(ctx, timeline, {
-      width: W, height: H, frame,
+    const ctx = canvas?.getContext("2d");
+    if (!canvas || !ctx) return;
+    if (canvas.width !== W) canvas.width = W;
+    if (canvas.height !== H) canvas.height = H;
+    drawFrame(ctx, store.timeline, {
+      width: W, height: H, frame: f,
       mediaName: (r) => store.media.asset(r)?.name ?? r,
       frameSource: fsRef.current ?? undefined,
     });
+    fsRef.current?.sweep();
+  };
+
+  // Paused / scrubbing: repaint on each store change.
+  useEffect(() => {
+    if (!playing) paint(frame);
   });
+
+  // Playing: a dedicated 60fps draw loop reads the live (real-time) video frames — smooth,
+  // independent of React's per-frame re-renders.
+  useEffect(() => {
+    if (!playing) return;
+    fsRef.current?.setPlaying(true);
+    let raf = 0;
+    const loop = () => {
+      paint(store.view.currentFrame);
+      raf = requestAnimationFrame(loop);
+    };
+    raf = requestAnimationFrame(loop);
+    return () => {
+      cancelAnimationFrame(raf);
+      fsRef.current?.setPlaying(false);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [playing]);
 
   return (
     <canvas

@@ -598,6 +598,12 @@ export class EditEngine {
     });
   }
 
+  /** Run an arbitrary timeline mutation as one undo step (higher-level ops like layouts). `work`
+   *  must NOT throw — validate before calling. Returns whether anything changed. */
+  run(name: string, work: () => void): boolean {
+    return this.commit(name, work);
+  }
+
   /** Partners that a timing change (duration/trim/speed) should propagate to. */
   timingPartners(ids: Set<string>): Set<string> {
     return this.timingPropagationPartners(ids);

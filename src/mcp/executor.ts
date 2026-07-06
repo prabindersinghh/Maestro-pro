@@ -5,7 +5,8 @@
 import type { AnimatableProperty, ClipType } from "../model/enums";
 import { isVisual } from "../model/enums";
 import type { AnimPair, Crop, Keyframe, KeyframeValue, Timeline } from "../model/types";
-import { defaultTrack } from "../model/defaults";
+import { defaultTrack, defaultClip } from "../model/defaults";
+import { LAYOUTS, LAYOUT_NAMES, layoutPlacement, type LayoutFit, type LayoutSlot } from "../model/layout";
 import { EditEngine, type InsertSpec, type MoveSpec, type PlaceSpec } from "../engine/editEngine";
 import { buildGetTimelineOutput } from "./getTimelineOutput";
 import { MediaLibrary } from "./mediaLibrary";
@@ -16,6 +17,7 @@ import { resolveRenderMediaPath } from "../render/mediaPath";
 import { encodeTimeline, decodeTimeline } from "../model/codec";
 import { encodeManifest, decodeManifest } from "../model/media";
 import { probeMedia } from "./probe";
+import { SkillStore } from "./skills";
 import { extractWaveform, type WaveformEnvelope } from "../audio/waveform";
 import { join } from "node:path";
 import type { VideoCodec, VideoResolution } from "../render/renderVideo";
@@ -134,6 +136,7 @@ export class McpExecutor {
     const READ_ONLY = new Set([
       "get_timeline", "get_media", "inspect_media", "get_transcript", "inspect_timeline",
       "search_media", "inspect_color", "list_folders", "list_models", "send_feedback", "export_project",
+      "list_skills", "read_skill",
     ]);
     try {
       const result = await this.run(name, args ?? {});
@@ -145,8 +148,17 @@ export class McpExecutor {
     }
   }
 
+  readonly skills = new SkillStore();
+
   private async run(name: string, a: Args): Promise<ToolResult> {
     switch (name) {
+      // Skills (Maestro extension — Palmier Agent/Skills over MCP)
+      case "list_skills": return okJson({ skills: (await this.skills.catalog()).map((s) => ({ id: s.id, name: s.name, description: s.description })) });
+      case "read_skill": {
+        const id = requireStr(a, "id");
+        const body = await this.skills.body(id);
+        return body ? ok(body) : err(`Unknown skill: ${id}. Call list_skills to see available skills.`);
+      }
       // Read
       case "get_timeline": return this.getTimeline(a);
       case "get_media": return okJson({ media: this.media.mediaRows() });
@@ -456,9 +468,107 @@ export class McpExecutor {
     return ok(`Undid: ${expected}. Re-read with get_timeline before editing again.`);
   }
 
-  private applyLayout(_a: Args): ToolResult {
-    // Layout solver (cover-crop transforms per slot) lands with compositing in Stage D.
-    return this.unavailable("apply_layout", "layout compositing (transform/crop solver)");
+  // apply_layout (ToolExecutor+Layout.swift): assign clips to a named layout's slots; the
+  // cover-crop solver (model/layout.ts) sets each transform + crop so it fills its region.
+  private applyLayout(a: Args): ToolResult {
+    const layoutName = requireStr(a, "layout");
+    const slots = LAYOUTS[layoutName];
+    if (!slots) throw new ToolFail(`unknown layout '${layoutName}'. Valid: ${LAYOUT_NAMES.join(", ")}`);
+    const fit = (aStr(a, "fit") ?? "fill") as LayoutFit;
+    if (fit !== "fill" && fit !== "fit") throw new ToolFail("apply_layout: fit must be 'fill' or 'fit'");
+    const slotArgs = aArr(a, "slots").map((s) => s as Args);
+    if (slotArgs.length === 0) throw new ToolFail("apply_layout needs a non-empty 'slots' array");
+
+    const slotById = new Map(slots.map((s) => [s.id, s]));
+    const anchorPos: Record<string, [number, number]> = {
+      center: [0.5, 0.5], top: [0.5, 0], bottom: [0.5, 1], left: [0, 0.5], right: [1, 0.5],
+      top_left: [0, 0], top_right: [1, 0], bottom_left: [0, 1], bottom_right: [1, 1],
+    };
+    const seen = new Set<string>();
+    let usesMedia = false, usesClip = false;
+    const entries: { slot: LayoutSlot; mediaRef?: string; clipIds?: string[]; ax: number; ay: number }[] = [];
+    for (const s of slotArgs) {
+      const slotId = requireStr(s, "slot");
+      const slot = slotById.get(slotId);
+      if (!slot) throw new ToolFail(`'${slotId}' is not a slot of '${layoutName}'. Slots: ${slots.map((x) => x.id).join(", ")}`);
+      if (seen.has(slotId)) throw new ToolFail(`duplicate slot '${slotId}'`);
+      seen.add(slotId);
+      const mediaRef = aStr(s, "mediaRef");
+      const clipIds = aStrArr(s, "clipIds");
+      const hasClips = clipIds.length > 0;
+      if ((mediaRef !== undefined) === hasClips) throw new ToolFail(`slot '${slotId}': provide exactly one of 'mediaRef' or 'clipIds'`);
+      const named = aStr(s, "anchor");
+      const ax = aNum(s, "anchorX") ?? (named ? anchorPos[named]?.[0] : undefined) ?? 0.5;
+      const ay = aNum(s, "anchorY") ?? (named ? anchorPos[named]?.[1] : undefined) ?? 0.5;
+      usesMedia ||= mediaRef !== undefined;
+      usesClip ||= hasClips;
+      entries.push({ slot, mediaRef, clipIds: hasClips ? clipIds : undefined, ax, ay });
+    }
+    const missing = slots.filter((s) => !seen.has(s.id)).map((s) => s.id);
+    if (missing.length) throw new ToolFail(`layout '${layoutName}' needs every slot filled. Missing: ${missing.join(", ")}`);
+    if (usesMedia && usesClip) throw new ToolFail("apply_layout: don't mix 'mediaRef' and 'clipIds' — all new (mediaRef) or all existing (clipIds).");
+
+    const cW = this.timeline.width, cH = this.timeline.height;
+    const summaries: string[] = [];
+
+    if (usesMedia) {
+      const startFrame = aInt(a, "startFrame") ?? 0;
+      const duration = aInt(a, "durationFrames");
+      if (duration === undefined || duration < 1) throw new ToolFail("apply_layout placing new clips requires durationFrames >= 1.");
+      // Pre-validate assets (no throwing inside the commit).
+      for (const e of entries) {
+        const asset = this.media.asset(e.mediaRef!);
+        if (!asset) throw new ToolFail(`slot '${e.slot.id}': asset not found: ${e.mediaRef}`);
+        if (asset.type !== "video" && asset.type !== "image") throw new ToolFail(`slot '${e.slot.id}': asset is ${asset.type}; layout slots take video or image.`);
+      }
+      const changed = this.engine.run("Apply Layout", () => {
+        const trackIdBySlot = new Map<string, string>();
+        for (const slot of [...slots].sort((x, y) => x.z - y.z)) {
+          const t = defaultTrack("video");
+          this.timeline.tracks.unshift(t);
+          trackIdBySlot.set(slot.id, t.id);
+        }
+        for (const e of entries) {
+          const asset = this.media.asset(e.mediaRef!)!;
+          const tIdx = this.timeline.tracks.findIndex((t) => t.id === trackIdBySlot.get(e.slot.id));
+          const p = layoutPlacement(asset.sourceWidth, asset.sourceHeight, cW, cH, e.slot.rect, fit, e.ax, e.ay);
+          const clip = defaultClip({ mediaRef: e.mediaRef!, startFrame, durationFrames: duration, mediaType: asset.type, sourceClipType: asset.type });
+          clip.transform = p.transform;
+          clip.crop = p.crop;
+          this.timeline.tracks[tIdx].clips.push(clip);
+          summaries.push(`${e.slot.id} → ${clip.id}`);
+        }
+      });
+      this.track(changed, "Apply Layout");
+    } else {
+      // Re-layout existing clips. Pre-resolve + validate.
+      const resolved: { slot: LayoutSlot; clip: import("../model/types").Clip; ax: number; ay: number }[] = [];
+      for (const e of entries) {
+        for (const cid of e.clipIds!) {
+          let found: import("../model/types").Clip | undefined;
+          for (const t of this.timeline.tracks) { const c = t.clips.find((x) => x.id === cid); if (c) { found = c; break; } }
+          if (!found) throw new ToolFail(`slot '${e.slot.id}': clip not found: ${cid}`);
+          if (found.mediaType !== "video" && found.mediaType !== "image") throw new ToolFail(`slot '${e.slot.id}': clip ${cid} is ${found.mediaType}; layout applies to video/image clips.`);
+          resolved.push({ slot: e.slot, clip: found, ax: e.ax, ay: e.ay });
+        }
+      }
+      const changed = this.engine.run("Apply Layout", () => {
+        for (const r of resolved) {
+          const asset = this.media.asset(r.clip.mediaRef);
+          const p = layoutPlacement(asset?.sourceWidth, asset?.sourceHeight, cW, cH, r.slot.rect, fit, r.ax, r.ay);
+          r.clip.transform = p.transform;
+          r.clip.crop = p.crop;
+          r.clip.positionTrack = undefined;
+          r.clip.scaleTrack = undefined;
+          r.clip.rotationTrack = undefined;
+          r.clip.cropTrack = undefined;
+          summaries.push(`${r.slot.id} → ${r.clip.id}`);
+        }
+      });
+      this.track(changed, "Apply Layout");
+    }
+
+    return okJson({ layout: layoutName, fit, slots: summaries });
   }
 
   private addTexts(a: Args): ToolResult {

@@ -74,17 +74,21 @@ export function Editor() {
     void previewAudio.play(store.timeline, Math.round(store.view.currentFrame), (r) => store.mediaSrcFor(r));
     let raf = 0;
     let last = performance.now();
+    let lastEmit = last;
     const tick = (now: number) => {
       const dt = (now - last) / 1000;
       last = now;
       floatFrame.current += dt * timeline.fps;
       const totalF = store.totalFrames;
       if (floatFrame.current >= totalF) { store.setCurrentFrame(totalF); store.setPlaying(false); return; }
-      store.setCurrentFrame(floatFrame.current);
+      // Advance the playhead directly; the preview has its own 60fps draw loop. Emit only ~20/s so
+      // the timeline playhead + timecode update without a per-frame React re-render storm.
+      store.view.currentFrame = floatFrame.current;
+      if (now - lastEmit > 50) { lastEmit = now; store.emit(); }
       raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);
-    return () => { cancelAnimationFrame(raf); previewAudio.stop(); };
+    return () => { cancelAnimationFrame(raf); previewAudio.stop(); store.emit(); };
   }, [playing, timeline.fps]);
 
   useEffect(() => {

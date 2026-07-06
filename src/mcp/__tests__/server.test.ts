@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { McpServer, MCP_PORT, MCP_HOST } from "../server";
 import { McpExecutor } from "../executor";
+import { TOOL_NAMES } from "../toolDefs";
 
 const PORT = 34567; // distinct from the contract port to avoid collisions during tests
 let server: McpServer;
@@ -36,10 +37,16 @@ describe("Stage-C: MCP HTTP transport (palmier-pro on 127.0.0.1)", () => {
     expect(json.result.capabilities.resources).toBeDefined();
   });
 
-  it("tools/list returns all 41 tools", async () => {
+  it("tools/list returns the frozen 41 plus the Skills extension (read_skill, list_skills)", async () => {
     const { json } = await rpc("tools/list", {});
-    expect(json.result.tools.length).toBe(41);
-    expect(json.result.tools.map((t: { name: string }) => t.name)).toContain("get_timeline");
+    const names = json.result.tools.map((t: { name: string }) => t.name);
+    // The frozen 41 parity tools are all still advertised.
+    for (const n of TOOL_NAMES) expect(names).toContain(n);
+    expect(names).toContain("get_timeline");
+    // Plus the two Maestro Skills-system extensions.
+    expect(names).toContain("read_skill");
+    expect(names).toContain("list_skills");
+    expect(json.result.tools.length).toBe(43);
   });
 
   it("tools/call get_timeline returns canGenerate:false", async () => {
