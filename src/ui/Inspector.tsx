@@ -5,11 +5,15 @@
 import { useState } from "react";
 import { store, useEditorVersion } from "../state/store";
 import { theme, clipColor, sectionLabelStyle } from "./theme";
-import { BLEND_MODES, type AnimatableProperty } from "../model/enums";
+import { BLEND_MODES, TEXT_ALIGNMENTS, TEXT_ANIMATION_PRESETS, type AnimatableProperty } from "../model/enums";
 import { endFrame } from "../model/helpers";
-import type { Clip } from "../model/types";
+import type { Clip, RGBA } from "../model/types";
 
 const round = (n: number, p = 100) => Math.round(n * p) / p;
+
+// RGBA (0..1) ↔ hex for <input type=color>.
+const toHex = (c: RGBA): string => "#" + [c.r, c.g, c.b].map((v) => Math.round(v * 255).toString(16).padStart(2, "0")).join("");
+const fromHex = (h: string, a = 1): RGBA => ({ r: parseInt(h.slice(1, 3), 16) / 255, g: parseInt(h.slice(3, 5), 16) / 255, b: parseInt(h.slice(5, 7), 16) / 255, a });
 
 // VolumeScale (InspectorView.swift): linear amplitude ↔ dB, floor = mute.
 const FLOOR_DB = -60;
@@ -45,6 +49,8 @@ export function Inspector() {
               {clip.startFrame}–{endFrame(clip)}f · {round(clip.durationFrames / fps, 100)}s{clip.mediaType !== "text" ? ` · trim ${clip.trimStartFrame}/${clip.trimEndFrame}` : ""}
             </div>
           </div>
+
+          {clip.mediaType === "text" && clip.textStyle && <TextSection clip={clip} />}
 
           {(clip.mediaType === "audio" || clip.mediaType === "video") && (
             <Section title="Levels">
@@ -135,6 +141,83 @@ function Row({ icon, label, children }: { icon: string; label: string; children:
       <div style={{ flex: 1 }} />
       {children}
     </div>
+  );
+}
+
+// --- Typography (Models/TextStyle.swift + TextAnimation) ---
+const FONTS = ["Inter", "Geist", "Arial", "Helvetica", "Georgia", "Times New Roman", "Courier New", "Impact"];
+
+function Toggle({ on, onClick, children, title }: { on: boolean; onClick: () => void; children: React.ReactNode; title?: string }) {
+  return (
+    <button title={title} onClick={onClick} style={{ minWidth: 30, height: 26, borderRadius: theme.radius.sm, cursor: "pointer", fontSize: theme.fontSize.smMd, border: `1px solid ${on ? theme.color.accent : theme.color.borderSubtle}`, background: on ? theme.color.prominent : theme.color.base, color: on ? theme.color.textPrimary : theme.color.textSecondary }}>{children}</button>
+  );
+}
+function ColorSwatch({ color, onChange }: { color: RGBA; onChange: (c: RGBA) => void }) {
+  return <input type="color" value={toHex(color)} onChange={(e) => onChange(fromHex(e.target.value, color.a))} style={{ width: 34, height: 24, padding: 0, border: `1px solid ${theme.color.borderSubtle}`, borderRadius: theme.radius.sm, background: "transparent", cursor: "pointer" }} />;
+}
+
+function TextSection({ clip }: { clip: Clip }) {
+  const st = clip.textStyle!;
+  const anim = clip.textAnimation ?? { preset: "none", perWordFrames: 3 };
+  const set = (style: Record<string, unknown>) => store.editText({ style });
+  return (
+    <>
+      <Section title="Text">
+        <textarea
+          defaultValue={clip.textContent ?? ""} key={clip.id}
+          onChange={(e) => store.editText({ content: e.target.value })}
+          rows={2}
+          style={{ width: "100%", boxSizing: "border-box", background: theme.color.base, color: theme.color.textPrimary, border: `1px solid ${theme.color.borderSubtle}`, borderRadius: theme.radius.sm, padding: "6px 8px", fontSize: theme.fontSize.smMd, fontFamily: theme.font.ui, resize: "vertical" }}
+        />
+        <Row icon="𝐀" label="Font">
+          <select value={FONTS.find((f) => st.fontName.startsWith(f)) ?? FONTS[0]} onChange={(e) => set({ fontName: e.target.value })} style={selectStyle}>
+            {FONTS.map((f) => <option key={f} value={f}>{f}</option>)}
+          </select>
+        </Row>
+        <NumRow icon="⇕" label="Size" value={Math.round(st.fontSize)} step={2} min={8} max={400} onCommit={(v) => set({ fontSize: v })} />
+        <Row icon="＂" label="Style">
+          <div style={{ display: "flex", gap: 4 }}>
+            <Toggle on={st.isBold} onClick={() => set({ isBold: !st.isBold })} title="Bold"><b>B</b></Toggle>
+            <Toggle on={st.isItalic} onClick={() => set({ isItalic: !st.isItalic })} title="Italic"><i>I</i></Toggle>
+          </div>
+        </Row>
+        <Row icon="≡" label="Align">
+          <div style={{ display: "flex", gap: 4 }}>
+            {TEXT_ALIGNMENTS.map((a) => (
+              <Toggle key={a} on={st.alignment === a} onClick={() => set({ alignment: a })} title={a}>{a === "left" ? "⯇" : a === "center" ? "≡" : "⯈"}</Toggle>
+            ))}
+          </div>
+        </Row>
+        <Row icon="🎨" label="Color"><ColorSwatch color={st.color} onChange={(c) => set({ color: c })} /></Row>
+      </Section>
+
+      <Section title="Text Style">
+        <Row icon="▭" label="Background">
+          <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+            <Toggle on={st.background.enabled} onClick={() => set({ background: { ...st.background, enabled: !st.background.enabled } })}>{st.background.enabled ? "On" : "Off"}</Toggle>
+            {st.background.enabled && <ColorSwatch color={st.background.color} onChange={(c) => set({ background: { ...st.background, color: c } })} />}
+          </div>
+        </Row>
+        <Row icon="◻" label="Outline">
+          <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+            <Toggle on={st.border.enabled} onClick={() => set({ border: { ...st.border, enabled: !st.border.enabled } })}>{st.border.enabled ? "On" : "Off"}</Toggle>
+            {st.border.enabled && <ColorSwatch color={st.border.color} onChange={(c) => set({ border: { ...st.border, color: c } })} />}
+          </div>
+        </Row>
+        <Row icon="◗" label="Shadow"><Toggle on={st.shadow.enabled} onClick={() => set({ shadow: { ...st.shadow, enabled: !st.shadow.enabled } })}>{st.shadow.enabled ? "On" : "Off"}</Toggle></Row>
+      </Section>
+
+      <Section title="Animation">
+        <Row icon="✨" label="Preset">
+          <select value={anim.preset} onChange={(e) => store.editText({ animation: { preset: e.target.value as typeof anim.preset } })} style={selectStyle}>
+            {TEXT_ANIMATION_PRESETS.map((p) => <option key={p} value={p}>{p}</option>)}
+          </select>
+        </Row>
+        {anim.preset !== "none" && (
+          <NumRow icon="⏲" label="Per-word" value={anim.perWordFrames} suffix="f" step={1} min={1} onCommit={(v) => store.editText({ animation: { perWordFrames: v } })} />
+        )}
+      </Section>
+    </>
   );
 }
 

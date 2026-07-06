@@ -5,6 +5,7 @@ import { Timeline } from "./timeline/Timeline";
 import { CanvasPreview } from "../compositor/CanvasPreview";
 import { Inspector } from "./Inspector";
 import { MediaPanel } from "./MediaPanel";
+import { Settings } from "./Settings";
 import { exportVideoFromUI } from "./exportVideo";
 import { previewAudio } from "../audio/previewAudio";
 
@@ -61,7 +62,7 @@ export function Editor() {
   const doExport = async () => {
     setExportMsg("Exporting…");
     try {
-      const r = await exportVideoFromUI("H.264", "1080p");
+      const r = await exportVideoFromUI(store.settings.exportCodec, store.settings.exportResolution);
       setExportMsg(`Exported → ${r.outputPath}`);
     } catch (e) {
       setExportMsg(e instanceof Error ? e.message : String(e));
@@ -143,9 +144,21 @@ export function Editor() {
         <div style={{ flex: 1 }} />
         <span style={{ fontSize: theme.fontSize.smMd, color: theme.color.textTertiary }}>Untitled Project</span>
         <div style={{ flex: 1 }} />
-        {exportMsg && <span style={{ fontSize: theme.fontSize.xs, color: theme.color.textTertiary, maxWidth: 300, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{exportMsg}</span>}
+        {exportMsg && <span style={{ fontSize: theme.fontSize.xs, color: theme.color.textTertiary, maxWidth: 240, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{exportMsg}</span>}
         <button
-          onClick={doExport} title="Render H.264 via FFmpeg"
+          onClick={() => store.openSettings(true)} title="Connect Claude over MCP"
+          style={{ background: "transparent", color: theme.color.textSecondary, border: `1px solid ${theme.color.borderSubtle}`, borderRadius: theme.radius.sm, padding: "6px 12px", fontSize: theme.fontSize.smMd, cursor: "pointer", fontFamily: theme.font.ui, display: "flex", alignItems: "center", gap: 6 }}
+        >
+          <span style={{ width: 7, height: 7, borderRadius: 4, background: store.bridge?.connected ? theme.color.success : "#e0a63b" }} /> Connect AI
+        </button>
+        <button
+          onClick={() => store.openSettings(true)} title="Settings"
+          style={{ background: "transparent", color: theme.color.textSecondary, border: "none", borderRadius: theme.radius.sm, padding: "6px 8px", fontSize: 16, cursor: "pointer" }}
+        >
+          ⚙
+        </button>
+        <button
+          onClick={doExport} title={`Render ${store.settings.exportCodec} via FFmpeg`}
           style={{ background: theme.color.accent, color: "#1a1a1a", border: "none", borderRadius: theme.radius.sm, padding: "6px 14px", fontSize: theme.fontSize.smMd, fontWeight: 600, cursor: "pointer", fontFamily: theme.font.ui }}
         >
           Export
@@ -199,6 +212,8 @@ export function Editor() {
           <Timeline />
         </div>
       </div>
+
+      <Settings />
     </div>
   );
 }

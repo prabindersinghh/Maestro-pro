@@ -44,6 +44,8 @@ export class EditorStore {
   engine: EditEngine;
   media: MediaLibrary;
   view: ViewState;
+  /** App preferences (export defaults, UI). Not part of the .palmier project. */
+  settings = { exportCodec: "H.264", exportResolution: "1080p", showSettings: false };
   private listeners = new Set<() => void>();
   private version = 0;
 
@@ -141,6 +143,23 @@ export class EditorStore {
     this.emit();
   }
 
+  openSettings(open: boolean): void { this.settings.showSettings = open; this.emit(); }
+  setExportDefaults(p: { codec?: string; resolution?: string }): void {
+    if (p.codec) this.settings.exportCodec = p.codec;
+    if (p.resolution) this.settings.exportResolution = p.resolution;
+    this.emit();
+  }
+  /** Change project fps/size (set_project_settings). Reflows nothing; affects render + preview. */
+  setProjectSettings(p: { fps?: number; width?: number; height?: number }): void {
+    this.engine.run("Project Settings", () => {
+      if (p.fps && p.fps > 0) this.timeline.fps = Math.round(p.fps);
+      if (p.width && p.width > 0) this.timeline.width = Math.round(p.width);
+      if (p.height && p.height > 0) this.timeline.height = Math.round(p.height);
+      this.timeline.settingsConfigured = true;
+    });
+    this.emit();
+  }
+
   /** Toggle a track's mute (audio) or hidden (visual) flag. */
   toggleTrackFlag(trackIndex: number): void {
     const t = this.timeline.tracks[trackIndex];
@@ -167,6 +186,21 @@ export class EditorStore {
   }
 
   // --- engine ops (each already one undo step) ---
+  /** Edit the selected text clip's content / style / animation (mirrors update_text). */
+  editText(patch: { content?: string; style?: Partial<Clip["textStyle"] & object>; animation?: Partial<Clip["textAnimation"] & object> }): void {
+    const ids = new Set(this.view.selectedClipIds);
+    if (ids.size === 0) return;
+    this.engine.mutateClips(ids, (c) => {
+      if (c.mediaType !== "text") return;
+      if (patch.content !== undefined) c.textContent = patch.content;
+      if (patch.style && c.textStyle) Object.assign(c.textStyle, patch.style);
+      if (patch.animation) {
+        c.textAnimation = { preset: "none", perWordFrames: 3, ...c.textAnimation, ...patch.animation } as Clip["textAnimation"];
+      }
+    }, "Edit Text");
+    this.emit();
+  }
+
   /** Trim a clip's left/right edge by a project-frame delta (drag handles); one undo step. */
   trimClip(clipId: string, edge: "left" | "right", deltaFrames: number): void {
     if (Math.round(deltaFrames) === 0) return;

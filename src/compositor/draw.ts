@@ -33,15 +33,41 @@ function drawText(ctx: CanvasRenderingContext2D, style: TextStyle, content: stri
   const anchorX = style.alignment === "left" ? box.x : style.alignment === "right" ? box.x + box.w : box.x + box.w / 2;
   const lines = content.split("\n");
   const lineHeight = size * 1.2;
-  let y = box.y + box.h / 2 - (lines.length * lineHeight) / 2 + lineHeight / 2;
+  const startY = box.y + box.h / 2 - (lines.length * lineHeight) / 2 + lineHeight / 2;
+
+  // Background fill (TextFill) — a padded rounded box behind the text block.
+  if (style.background.enabled) {
+    let maxW = 0;
+    for (const line of lines) maxW = Math.max(maxW, ctx.measureText(line).width);
+    const padX = size * 0.35, padY = size * 0.2;
+    const bx = (style.alignment === "left" ? box.x : style.alignment === "right" ? box.x + box.w - maxW : box.x + box.w / 2 - maxW / 2) - padX;
+    const by = startY - lineHeight / 2 - padY;
+    const bw = maxW + padX * 2;
+    const bh = lines.length * lineHeight + padY * 2;
+    const r = Math.min(size * 0.25, bw / 2, bh / 2);
+    ctx.fillStyle = rgbaCss(style.background.color);
+    ctx.beginPath();
+    ctx.roundRect(bx, by, bw, bh, r);
+    ctx.fill();
+  }
+
   if (style.shadow.enabled) {
     ctx.shadowColor = rgbaCss(style.shadow.color);
     ctx.shadowOffsetX = style.shadow.offsetX;
     ctx.shadowOffsetY = style.shadow.offsetY;
     ctx.shadowBlur = style.shadow.blur;
   }
+  // Outline (border TextFill) drawn under the fill.
+  const stroke = style.border.enabled;
+  if (stroke) {
+    ctx.strokeStyle = rgbaCss(style.border.color);
+    ctx.lineWidth = Math.max(1, size * 0.06);
+    ctx.lineJoin = "round";
+  }
   ctx.fillStyle = rgbaCss(style.color);
+  let y = startY;
   for (const line of lines) {
+    if (stroke) ctx.strokeText(line, anchorX, y);
     ctx.fillText(line, anchorX, y);
     y += lineHeight;
   }
