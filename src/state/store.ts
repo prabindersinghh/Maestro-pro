@@ -45,7 +45,7 @@ export class EditorStore {
   media: MediaLibrary;
   view: ViewState;
   /** App preferences (export defaults, UI). Not part of the .palmier project. */
-  settings = { exportCodec: "H.264", exportResolution: "1080p", showSettings: false };
+  settings = { exportCodec: "H.264", exportResolution: "1080p", showSettings: false, showGenerate: false };
   private listeners = new Set<() => void>();
   private version = 0;
 
@@ -144,6 +144,7 @@ export class EditorStore {
   }
 
   openSettings(open: boolean): void { this.settings.showSettings = open; this.emit(); }
+  openGenerate(open: boolean): void { this.settings.showGenerate = open; this.emit(); }
   setExportDefaults(p: { codec?: string; resolution?: string }): void {
     if (p.codec) this.settings.exportCodec = p.codec;
     if (p.resolution) this.settings.exportResolution = p.resolution;

@@ -68,13 +68,22 @@ export function MediaPanel() {
     <div style={{ width: 244, flex: "0 0 auto", background: theme.color.surface, borderRight: `1px solid ${theme.color.borderPrimary}`, overflowY: "auto", fontFamily: theme.font.ui, display: "flex", flexDirection: "column" }}>
       <div style={{ height: theme.timeline.panelHeaderHeight, display: "flex", alignItems: "center", justifyContent: "space-between", padding: `0 ${theme.space.lg}px`, borderBottom: `1px solid ${theme.color.borderPrimary}`, background: theme.color.raised, flex: "0 0 auto" }}>
         <span style={sectionLabelStyle}>Media</span>
-        <button
-          onClick={onImportClick}
-          title="Import media files (or drag files anywhere into the window)"
-          style={{ background: theme.color.prominent, color: theme.color.textPrimary, border: `1px solid ${theme.color.borderPrimary}`, borderRadius: theme.radius.sm, padding: "3px 10px", fontSize: theme.fontSize.sm, cursor: "pointer", fontFamily: theme.font.ui }}
-        >
-          ＋ Import
-        </button>
+        <div style={{ display: "flex", gap: theme.space.xs }}>
+          <button
+            onClick={() => store.openGenerate(true)}
+            title="Generate media with AI (open backend — see Strategy)"
+            style={{ background: theme.color.base, color: theme.color.textSecondary, border: `1px solid ${theme.color.borderSubtle}`, borderRadius: theme.radius.sm, padding: "3px 9px", fontSize: theme.fontSize.sm, cursor: "pointer", fontFamily: theme.font.ui }}
+          >
+            ✨ Generate
+          </button>
+          <button
+            onClick={onImportClick}
+            title="Import media files (or drag files anywhere into the window)"
+            style={{ background: theme.color.prominent, color: theme.color.textPrimary, border: `1px solid ${theme.color.borderPrimary}`, borderRadius: theme.radius.sm, padding: "3px 10px", fontSize: theme.fontSize.sm, cursor: "pointer", fontFamily: theme.font.ui }}
+          >
+            ＋ Import
+          </button>
+        </div>
         <input
           ref={fileRef} type="file" multiple accept="video/*,audio/*,image/*" style={{ display: "none" }}
           onChange={(e) => { if (e.target.files?.length) void importFiles(e.target.files); e.target.value = ""; }}

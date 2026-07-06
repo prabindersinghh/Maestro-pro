@@ -6,6 +6,7 @@ import { CanvasPreview } from "../compositor/CanvasPreview";
 import { Inspector } from "./Inspector";
 import { MediaPanel } from "./MediaPanel";
 import { Settings } from "./Settings";
+import { GenerationPanel } from "./GenerationPanel";
 import { exportVideoFromUI } from "./exportVideo";
 import { previewAudio } from "../audio/previewAudio";
 
@@ -214,6 +215,7 @@ export function Editor() {
       </div>
 
       <Settings />
+      <GenerationPanel />
     </div>
   );
 }
