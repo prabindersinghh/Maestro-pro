@@ -1,22 +1,78 @@
-// Tauri 2 entry point. Exposes `export_video`, which renders the current project to a video file
-// by piping its JSON to the Node render CLI (@napi-rs/canvas → FFmpeg). Node is spawned with the
-// tsx loader so no build step is needed in dev.
+// Tauri 2 entry point. In a PACKAGED build it runs everything from bundled resources (a bundled
+// Node runtime + the esbuild'd server/renderCli + bundled FFmpeg + native canvas) so the user needs
+// no Node/npm/tsx/FFmpeg. In `tauri dev` it falls back to `node --import tsx <source>`.
 
 use std::io::Write;
+use std::path::PathBuf;
 use std::process::{Command, Stdio};
+use tauri::path::BaseDirectory;
+use tauri::{AppHandle, Manager};
 
-/// Render the project to a video file. `project_json` = {timeline, media}; returns the CLI's
-/// result JSON ({outputPath, frames, width, height, codec}) or an error string.
+#[cfg(target_os = "windows")]
+const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+
+fn no_window(cmd: &mut Command) {
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+        cmd.creation_flags(CREATE_NO_WINDOW);
+    }
+    let _ = cmd;
+}
+
+/// Present only in a packaged build (bundled resources exist). Holds the paths the child needs.
+struct Packaged {
+    node: PathBuf,
+    res: PathBuf,
+    data: PathBuf,
+}
+
+fn packaged(app: &AppHandle) -> Option<Packaged> {
+    let res = app.path().resolve("resources", BaseDirectory::Resource).ok()?;
+    if !res.join("dist-server").join("server.cjs").exists() {
+        return None; // dev
+    }
+    let data = app.path().app_data_dir().ok()?;
+    let _ = std::fs::create_dir_all(&data);
+    Some(Packaged { node: res.join("node.exe"), res, data })
+}
+
+fn apply_env(cmd: &mut Command, p: &Packaged) {
+    cmd.current_dir(&p.data)
+        .env("MAESTRO_FFMPEG", p.res.join("ffmpeg.exe"))
+        .env("MAESTRO_FFPROBE", p.res.join("ffprobe.exe"))
+        .env("MAESTRO_PUBLIC_DIR", p.res.join("public"))
+        .env("MAESTRO_REMOTION_DIR", p.res.join("remotion"))
+        .env("MAESTRO_DATA_DIR", &p.data)
+        .env("NODE_PATH", p.res.join("node_modules"));
+}
+
+/// Render the project to a video file (Export button). Packaged: bundled node + renderCli.cjs.
 #[tauri::command]
-fn export_video(project_json: String, out_path: String, codec: String, resolution: String) -> Result<String, String> {
-    // In `tauri dev` the working dir is src-tauri/; the frontend project root (with node_modules
-    // and src/render/renderCli.ts) is its parent.
-    let cwd = std::env::current_dir().map_err(|e| e.to_string())?;
-    let project_root = cwd.parent().map(|p| p.to_path_buf()).unwrap_or(cwd);
-
-    let mut child = Command::new("node")
-        .args(["--import", "tsx", "src/render/renderCli.ts", &out_path, &codec, &resolution])
-        .current_dir(&project_root)
+fn export_video(
+    app: AppHandle,
+    project_json: String,
+    out_path: String,
+    codec: String,
+    resolution: String,
+) -> Result<String, String> {
+    let mut cmd;
+    if let Some(p) = packaged(&app) {
+        cmd = Command::new(&p.node);
+        cmd.arg(p.res.join("dist-server").join("renderCli.cjs"))
+            .arg(&out_path)
+            .arg(&codec)
+            .arg(&resolution);
+        apply_env(&mut cmd, &p);
+    } else {
+        let cwd = std::env::current_dir().map_err(|e| e.to_string())?;
+        let project_root = cwd.parent().map(|p| p.to_path_buf()).unwrap_or(cwd);
+        cmd = Command::new("node");
+        cmd.args(["--import", "tsx", "src/render/renderCli.ts", &out_path, &codec, &resolution])
+            .current_dir(&project_root);
+    }
+    no_window(&mut cmd);
+    let mut child = cmd
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
@@ -38,8 +94,7 @@ fn export_video(project_json: String, out_path: String, codec: String, resolutio
     }
 }
 
-/// One-click Option B: open a new terminal window that connects Claude Code to Maestro's MCP server
-/// and launches it. `& claude` runs even if the server was already added.
+/// One-click Option B: a terminal window that connects Claude Code to Maestro and launches it.
 #[tauri::command]
 fn launch_claude_code() -> Result<String, String> {
     let connect = "claude mcp add --transport http palmier-pro http://127.0.0.1:19789/mcp & claude";
@@ -58,21 +113,24 @@ fn launch_claude_code() -> Result<String, String> {
     Ok("launched".into())
 }
 
-/// Spawn the project/MCP server (shared state + media + Claude's MCP endpoint) as a child.
-/// If port 19789 is already taken (server running externally), the child exits harmlessly.
-fn spawn_project_server() {
-    let cwd = match std::env::current_dir() {
-        Ok(d) => d,
-        Err(_) => return,
-    };
-    let project_root = cwd.parent().map(|p| p.to_path_buf()).unwrap_or(cwd);
-    let _ = Command::new("node")
-        .args(["--import", "tsx", "src/mcp/main.ts"])
-        .current_dir(&project_root)
-        .stdin(Stdio::null())
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
-        .spawn();
+/// Start the project/MCP server as a child. Packaged: bundled node + server.cjs + resource env.
+fn spawn_project_server(app: &AppHandle) {
+    let mut cmd;
+    if let Some(p) = packaged(app) {
+        cmd = Command::new(&p.node);
+        cmd.arg(p.res.join("dist-server").join("server.cjs"));
+        apply_env(&mut cmd, &p);
+    } else {
+        let cwd = match std::env::current_dir() {
+            Ok(d) => d,
+            Err(_) => return,
+        };
+        let project_root = cwd.parent().map(|p| p.to_path_buf()).unwrap_or(cwd);
+        cmd = Command::new("node");
+        cmd.args(["--import", "tsx", "src/mcp/main.ts"]).current_dir(&project_root);
+    }
+    no_window(&mut cmd);
+    let _ = cmd.stdin(Stdio::null()).stdout(Stdio::null()).stderr(Stdio::null()).spawn();
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -80,8 +138,8 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_dialog::init())
-        .setup(|_app| {
-            spawn_project_server();
+        .setup(|app| {
+            spawn_project_server(&app.handle());
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![export_video, launch_claude_code])
