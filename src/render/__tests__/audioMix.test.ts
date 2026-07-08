@@ -50,6 +50,16 @@ describe("buildAudioMix", () => {
     expect(buildAudioMix(t, path)).toBeNull();
   });
 
+  it("emits a keyframed volume ENVELOPE (eval=frame) when the clip has volume keyframes", () => {
+    const c = defaultClip({ mediaRef: "a", startFrame: 0, durationFrames: 60, mediaType: "audio" });
+    c.volume = 1;
+    c.volumeTrack = { keyframes: [{ frame: 0, value: -40, interpolationOut: "smooth" }, { frame: 59, value: 0, interpolationOut: "smooth" }] };
+    const t = tl({ tracks: [{ ...defaultTrack("audio", "a1"), clips: [c] }] });
+    const plan = buildAudioMix(t, path)!;
+    expect(plan.filterComplex).toContain("eval=frame");
+    expect(plan.filterComplex).toMatch(/volume='if\(lt\(t,/); // piecewise-linear gain expression
+  });
+
   it("applies head/tail fades", () => {
     const c = defaultClip({ mediaRef: "a", startFrame: 0, durationFrames: 60, mediaType: "audio" });
     c.fadeInFrames = 15;

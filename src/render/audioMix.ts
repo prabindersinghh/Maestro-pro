@@ -4,8 +4,9 @@
 // CompositionBuilder assembles with AVFoundation on macOS. Keyframed audio volume is not mixed
 // (matches FCPXMLExporter, which drops it) — noted in UPGRADES.
 
-import type { Timeline } from "../model/types";
+import type { Clip, Timeline } from "../model/types";
 import { endFrame } from "../model/helpers";
+import { rawVolumeAt } from "../model/clipSampling";
 
 export interface AudioMixInput {
   path: string;
@@ -15,6 +16,31 @@ export interface AudioMixInput {
 export interface AudioMixPlan {
   inputs: string[];          // file paths, in ffmpeg input order (after the video pipe)
   filterComplex: string;     // full -filter_complex value producing [aout]
+}
+
+/**
+ * FFmpeg volume step for a clip: a keyframed volume track becomes a piecewise-linear GAIN envelope
+ * `volume='…':eval=frame` (dB→linear via rawVolumeAt, so it matches the preview at each keyframe);
+ * otherwise the static volume. `t` is the clip's output time (0…outDurSec, after atrim/atempo).
+ */
+export function volumeStep(clip: Clip, fps: number, outDurSec: number): string | null {
+  const kfs = clip.volumeTrack?.keyframes ?? [];
+  if (kfs.length === 0) return Math.abs(clip.volume - 1) > 1e-6 ? `volume=${clip.volume.toFixed(6)}` : null;
+
+  const pts = [...kfs].sort((a, b) => a.frame - b.frame)
+    .map((k) => ({ t: Math.max(0, Math.min(outDurSec, k.frame / fps)), g: rawVolumeAt(clip, clip.startFrame + k.frame) }))
+    .filter((p, i, arr) => i === 0 || p.t !== arr[i - 1].t);
+  if (pts.length === 1) return `volume=${pts[0].g.toFixed(6)}`;
+
+  // Build nested piecewise-linear expression, back to front. Commas are protected by single quotes.
+  let expr = pts[pts.length - 1].g.toFixed(6); // hold after the last keyframe
+  for (let i = pts.length - 2; i >= 0; i--) {
+    const a = pts[i], b = pts[i + 1];
+    const ramp = `(${a.g.toFixed(6)}+(${(b.g - a.g).toFixed(6)})*(t-${a.t.toFixed(6)})/${(b.t - a.t || 1).toFixed(6)})`;
+    expr = `if(lt(t,${b.t.toFixed(6)}),${ramp},${expr})`;
+  }
+  expr = `if(lt(t,${pts[0].t.toFixed(6)}),${pts[0].g.toFixed(6)},${expr})`;
+  return `volume='${expr}':eval=frame`;
 }
 
 /** atempo only accepts [0.5, 100] per stage — chain stages for slower speeds. */
@@ -62,7 +88,8 @@ export function buildAudioMix(
       ];
       const tempo = atempoChain(clip.speed);
       if (tempo) steps.push(tempo);
-      if (Math.abs(clip.volume - 1) > 1e-6) steps.push(`volume=${clip.volume.toFixed(6)}`);
+      const vstep = volumeStep(clip, fps, outDurSec);
+      if (vstep) steps.push(vstep);
       if (fadeInSec > 0) steps.push(`afade=t=in:st=0:d=${fadeInSec.toFixed(6)}`);
       if (fadeOutSec > 0) steps.push(`afade=t=out:st=${Math.max(0, outDurSec - fadeOutSec).toFixed(6)}:d=${fadeOutSec.toFixed(6)}`);
       steps.push(`adelay=${delayMs}:all=1`);
