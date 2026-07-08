@@ -18,6 +18,7 @@ import {
   clampFadesToDuration, clampKeyframesToDuration, rescaleKeyframes, rescaleWordTimings,
   setClipDuration, splitClipKeyframes, trimValues, upsertKeyframe, type TrimEdge,
 } from "./clipOps";
+import { planTransition, isHardCut, type TransitionKind } from "../model/transitions";
 
 export interface ClipLocation {
   trackIndex: number;
@@ -122,6 +123,53 @@ export class EditEngine {
 
   get canUndo(): boolean {
     return this.undoStack.length > 0;
+  }
+
+  // MARK: - Transitions
+
+  /** Apply a transition of `durationFrames` into `cur` from the adjacent `prev` on the same track. */
+  private applyTransitionEdit(prev: Clip, cur: Clip, durationFrames: number): TransitionKind {
+    const plan = planTransition(prev, cur, durationFrames);
+    prev.fadeOutFrames = plan.prevFadeOutFrames;
+    cur.startFrame = plan.cur.startFrame;
+    cur.trimStartFrame = plan.cur.trimStartFrame;
+    cur.durationFrames = plan.cur.durationFrames;
+    cur.fadeInFrames = plan.cur.fadeInFrames;
+    clampFadesToDuration(prev);
+    clampFadesToDuration(cur);
+    return plan.kind;
+  }
+
+  /** Insert a transition at every hard cut on every track. Returns how many were inserted. */
+  addTransitionsAtCuts(durationFrames: number): number {
+    let count = 0;
+    this.commit("Add Transitions", () => {
+      for (const track of this.timeline.tracks) {
+        const ordered = [...track.clips].sort((a, b) => a.startFrame - b.startFrame);
+        for (let i = 1; i < ordered.length; i++) {
+          const prev = ordered[i - 1], cur = ordered[i];
+          if (!isHardCut(prev, cur)) continue; // only butted cuts — never across a gap
+          this.applyTransitionEdit(prev, cur, durationFrames);
+          count++;
+        }
+      }
+    });
+    return count;
+  }
+
+  /** Cross-dissolve into a single clip from whatever clip abuts its left edge. */
+  crossDissolveInto(clipId: string, durationFrames: number): TransitionKind | null {
+    let kind: TransitionKind | null = null;
+    this.commit("Cross Dissolve", () => {
+      const loc = this.findClip(clipId);
+      if (!loc) return;
+      const track = this.timeline.tracks[loc.trackIndex];
+      const cur = track.clips[loc.clipIndex];
+      const prev = track.clips.find((c) => c.id !== cur.id && isHardCut(c, cur));
+      if (!prev) return;
+      kind = this.applyTransitionEdit(prev, cur, durationFrames);
+    });
+    return kind;
   }
 
   // MARK: - Lookups

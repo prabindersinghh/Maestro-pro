@@ -60,6 +60,9 @@ export class EditorStore {
   };
   private listeners = new Set<() => void>();
   private version = 0;
+  /** Transient status messages shown as toasts (transitions added, import errors, …). */
+  toasts: { id: number; text: string; kind: "info" | "error" }[] = [];
+  private toastSeq = 0;
 
   constructor(timeline: Timeline, media: MediaLibrary) {
     this.engine = new EditEngine(timeline);
@@ -86,6 +89,19 @@ export class EditorStore {
     this.version++;
     this.bridge?.onLocalChange();
     for (const l of this.listeners) l();
+  }
+
+  /** Show a transient toast; auto-dismisses. */
+  toast(text: string, kind: "info" | "error" = "info"): void {
+    const id = ++this.toastSeq;
+    this.toasts = [...this.toasts, { id, text, kind }];
+    this.version++;
+    for (const l of this.listeners) l();
+    setTimeout(() => {
+      this.toasts = this.toasts.filter((t) => t.id !== id);
+      this.version++;
+      for (const l of this.listeners) l();
+    }, kind === "error" ? 6000 : 3500);
   }
 
   // --- project bridge (shared state with the MCP server) ---
@@ -204,6 +220,14 @@ export class EditorStore {
     if (t.type === "audio") t.muted = !t.muted;
     else t.hidden = !t.hidden;
     this.emit();
+  }
+
+  /** Auto-insert transitions at every hard cut (cross-dissolve where possible, else dip-to-black). */
+  addTransitionsAtCuts(durationSeconds = 0.5): number {
+    const frames = Math.max(1, Math.round(durationSeconds * this.timeline.fps));
+    const n = this.engine.addTransitionsAtCuts(frames);
+    if (n > 0) this.emit();
+    return n;
   }
 
   // --- selection ---

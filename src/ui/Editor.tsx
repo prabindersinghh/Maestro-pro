@@ -59,6 +59,7 @@ export function Editor() {
   const { currentFrame, pixelsPerFrame, playing } = store.view;
   const floatFrame = useRef(currentFrame);
   const [exportMsg, setExportMsg] = useState<string | null>(null);
+  const [dragActive, setDragActive] = useState(false);
   const total = store.totalFrames;
 
   const doExport = async () => {
@@ -109,19 +110,32 @@ export function Editor() {
 
   useEffect(() => {
     store.startBridge();
-    const onDragOver = (e: DragEvent) => e.preventDefault();
+    // Robust drag-drop import: any file type / large files stream through the server, and every
+    // failure surfaces as a toast instead of being silently swallowed.
+    const importOne = async (name: string, run: () => Promise<unknown>) => {
+      try { await run(); store.toast(`Imported ${name}`); }
+      catch (e) { store.toast(`Couldn't import ${name}: ${e instanceof Error ? e.message : String(e)}`, "error"); }
+    };
+    const onDragOver = (e: DragEvent) => { e.preventDefault(); setDragActive(true); };
+    const onDragLeave = (e: DragEvent) => { if (e.relatedTarget === null) setDragActive(false); };
     const onDrop = (e: DragEvent) => {
-      e.preventDefault();
+      e.preventDefault(); setDragActive(false);
       const files = e.dataTransfer?.files;
-      if (files?.length) for (const f of files) void store.bridge?.importFile(f);
+      if (files?.length) for (const f of files) void importOne(f.name, () => store.bridge!.importFile(f));
     };
     window.addEventListener("dragover", onDragOver);
+    window.addEventListener("dragleave", onDragLeave);
     window.addEventListener("drop", onDrop);
     let unlisten: (() => void) | undefined;
     if ("__TAURI_INTERNALS__" in globalThis) {
       void import("@tauri-apps/api/webview").then(async ({ getCurrentWebview }) => {
         unlisten = await getCurrentWebview().onDragDropEvent((event) => {
-          if (event.payload.type === "drop") for (const p of event.payload.paths) void store.bridge?.importPath(p);
+          if (event.payload.type === "enter" || event.payload.type === "over") setDragActive(true);
+          else if (event.payload.type === "leave") setDragActive(false);
+          else if (event.payload.type === "drop") {
+            setDragActive(false);
+            for (const p of event.payload.paths) void importOne(p.split(/[/\\]/).pop() ?? p, () => store.bridge!.importPath(p));
+          }
         });
       }).catch(() => undefined);
     }
@@ -206,6 +220,11 @@ export function Editor() {
           <div style={{ width: 1, height: 18, background: theme.color.borderSubtle, margin: `0 ${theme.space.xs}px` }} />
           <IconBtn glyph="▚" title="Split at playhead (S)" onClick={() => store.splitAtPlayhead()} />
           <IconBtn glyph="🗑" title="Delete selected (Del)" onClick={() => store.removeSelected()} size={13} />
+          <div style={{ width: 1, height: 18, background: theme.color.borderSubtle, margin: `0 ${theme.space.xs}px` }} />
+          <IconBtn glyph="⇄" title="Add transitions at cuts (cross-dissolve, 0.5s)" onClick={() => {
+            const n = store.addTransitionsAtCuts(0.5);
+            store.toast?.(n > 0 ? `Added ${n} transition${n === 1 ? "" : "s"} at cuts.` : "No hard cuts to transition — clips need to butt together.");
+          }} />
           <div style={{ flex: 1 }} />
           <IconBtn glyph="－" title="Zoom out" onClick={() => store.setZoom(pixelsPerFrame / theme.zoom.stepFactor)} />
           <input
@@ -222,6 +241,24 @@ export function Editor() {
 
       <Settings />
       <GenerationPanel />
+
+      {/* Drag-drop hint overlay */}
+      {dragActive && (
+        <div style={{ position: "fixed", inset: 0, zIndex: 90, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.45)", border: `3px dashed ${theme.color.accent}`, pointerEvents: "none" }}>
+          <div style={{ fontSize: theme.fontSize.mdLg, fontWeight: 600, color: theme.color.textPrimary, background: theme.color.surface, padding: `${theme.space.md}px ${theme.space.xl}px`, borderRadius: theme.radius.mdLg, border: `1px solid ${theme.color.borderPrimary}` }}>
+            Drop media to import — video, audio, or images
+          </div>
+        </div>
+      )}
+
+      {/* Toast stack */}
+      <div style={{ position: "fixed", bottom: 16, left: "50%", transform: "translateX(-50%)", zIndex: 200, display: "flex", flexDirection: "column", gap: 8, alignItems: "center", pointerEvents: "none" }}>
+        {store.toasts.map((t) => (
+          <div key={t.id} style={{ maxWidth: 520, fontSize: theme.fontSize.smMd, color: t.kind === "error" ? "#ffd9d9" : theme.color.textPrimary, background: t.kind === "error" ? "#5a2020" : theme.color.raised, border: `1px solid ${t.kind === "error" ? "#a34" : theme.color.borderPrimary}`, borderRadius: theme.radius.sm, padding: `${theme.space.sm}px ${theme.space.md}px`, boxShadow: "0 8px 24px rgba(0,0,0,0.5)" }}>
+            {t.text}
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
