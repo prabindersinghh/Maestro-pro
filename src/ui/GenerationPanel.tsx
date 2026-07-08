@@ -1,8 +1,8 @@
 // Generation panel — ports the surface of Palmier's Generation/UI/GenerationView (kind tabs, model
-// picker, prompt box, aspect/duration, reference tiles, Generate). Generation itself is NOT wired in
-// this open build (Palmier's is a closed paid cloud) — the panel is honest about that: it shows the
-// interface and, on Generate, explains that a free/open backend (LTX-2 local or Fal/Replicate) is
-// set up in STRATEGY ③. It never fakes a result.
+// picker, prompt box, aspect/duration, Generate). Wired to HOSTED generation (STRATEGY ③): the user
+// brings their own Fal or Replicate key (pay-per-clip on their account), the panel calls
+// generate_video/generate_image over MCP, and the result auto-imports + places on the timeline.
+// It never fakes a clip — on success the real generated clip appears; on error it shows the reason.
 
 import { useState } from "react";
 import { store, useEditorVersion } from "../state/store";
@@ -10,41 +10,42 @@ import { theme, sectionLabelStyle } from "./theme";
 
 type Kind = "video" | "image" | "audio";
 
-// Representative open-model catalog (STRATEGY ③). Marked "setup required" until wired.
-const MODELS: Record<Kind, { id: string; label: string; note: string }[]> = {
-  video: [
-    { id: "ltx-2", label: "LTX-2", note: "open weights · 4K · synced audio · Apache-2.0" },
-    { id: "wan-2.2", label: "Wan 2.2", note: "via Open-Generative-AI" },
-  ],
-  image: [
-    { id: "flux", label: "FLUX", note: "via Open-Generative-AI" },
-    { id: "ltx-image", label: "LTX image", note: "open weights" },
-  ],
-  audio: [{ id: "open-audio", label: "Open audio", note: "TBD open backend" }],
-};
-
 const ASPECTS = ["16:9", "9:16", "1:1", "4:5"];
 
 export function GenerationPanel() {
   useEditorVersion();
   const [kind, setKind] = useState<Kind>("video");
-  const [model, setModel] = useState("ltx-2");
   const [prompt, setPrompt] = useState("");
   const [aspect, setAspect] = useState("16:9");
   const [seconds, setSeconds] = useState(5);
-  const [status, setStatus] = useState<string | null>(null);
+  const [status, setStatus] = useState<{ kind: "info" | "error" | "ok"; text: string } | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [keyInput, setKeyInput] = useState(store.settings.genKey);
 
   if (!store.settings.showGenerate) return null;
+  const provider = store.settings.genProvider;
+  const hasKey = !!store.settings.genKey;
 
-  const models = MODELS[kind];
-  const onGenerate = () => {
-    // Honest: no closed cloud, no faked clip. Explain the open path.
-    setStatus(
-      `Generation isn't wired in this open build yet. Per docs/STRATEGY.md ③, this connects to a free/` +
-      `open backend — LTX-2 locally on an NVIDIA GPU, or a hosted API (Fal/Replicate) — then the result ` +
-      `auto-imports to the timeline via import_media. Not faking a clip.`,
-    );
+  const saveKey = async () => {
+    try { await store.saveGenKey(keyInput.trim()); setStatus({ kind: "ok", text: keyInput.trim() ? `${provider === "fal" ? "Fal" : "Replicate"} key saved. You can generate now.` : "Key cleared." }); }
+    catch (e) { setStatus({ kind: "error", text: e instanceof Error ? e.message : String(e) }); }
   };
+
+  const onGenerate = async () => {
+    if (kind === "audio") { setStatus({ kind: "info", text: "Audio generation isn't wired yet. Use Generate → animated titles (generate_title) or import audio." }); return; }
+    if (!prompt.trim()) { setStatus({ kind: "error", text: "Enter a prompt describing what to generate." }); return; }
+    if (!hasKey) { setStatus({ kind: "error", text: `Add your ${provider === "fal" ? "Fal" : "Replicate"} key above first — generation runs on your account (~$0.02–0.10/video, ~$0.003–0.03/image).` }); return; }
+    setBusy(true);
+    setStatus({ kind: "info", text: `Generating ${kind} on ${provider === "fal" ? "Fal" : "Replicate"}… this can take 15–90s. The clip will drop onto the timeline when it's ready.` });
+    try {
+      const res = await store.generate(kind, prompt.trim(), { aspectRatio: aspect, durationSeconds: kind === "video" ? seconds : undefined });
+      setStatus({ kind: "ok", text: `Done — placed "${String(res.name ?? "clip")}" on the timeline${res.width ? ` (${res.width}×${res.height})` : ""}.` });
+    } catch (e) {
+      setStatus({ kind: "error", text: e instanceof Error ? e.message : String(e) });
+    } finally { setBusy(false); }
+  };
+
+  const statusColor = status?.kind === "error" ? "#e88" : status?.kind === "ok" ? "#9d9" : theme.color.textSecondary;
 
   return (
     <div onClick={() => store.openGenerate(false)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100 }}>
@@ -55,26 +56,35 @@ export function GenerationPanel() {
         </div>
 
         <div style={{ padding: theme.space.xl, overflowY: "auto", display: "flex", flexDirection: "column", gap: theme.space.lg }}>
-          <div style={{ background: "#3a2f12", border: "1px solid #7a5c1e", borderRadius: theme.radius.sm, padding: `${theme.space.smMd}px ${theme.space.md}px`, fontSize: theme.fontSize.xs, color: "#e8c774" }}>
-            Open build — generation backend not connected yet. This is the interface; wiring lands with STRATEGY ③ (free/open LTX-2 or a hosted API). Results auto-import to the timeline.
+          {/* BYOK key row */}
+          <div style={{ background: theme.color.base, border: `1px solid ${hasKey ? "#2e5" : theme.color.borderSubtle}`, borderRadius: theme.radius.sm, padding: theme.space.md, display: "flex", flexDirection: "column", gap: theme.space.sm }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <span style={{ ...sectionLabelStyle }}>Generation provider (bring your own key)</span>
+              <span style={{ fontSize: theme.fontSize.xs, color: hasKey ? "#9d9" : theme.color.textSecondary }}>{hasKey ? "● key set" : "○ no key"}</span>
+            </div>
+            <div style={{ display: "flex", gap: theme.space.xs }}>
+              {(["fal", "replicate"] as const).map((p) => (
+                <button key={p} onClick={() => store.setGenProvider(p)} style={{ flex: 1, padding: "6px", borderRadius: theme.radius.sm, cursor: "pointer", textTransform: "capitalize", border: `1px solid ${provider === p ? theme.color.accent : theme.color.borderSubtle}`, background: provider === p ? theme.color.prominent : theme.color.base, color: provider === p ? theme.color.textPrimary : theme.color.textSecondary, fontSize: theme.fontSize.smMd }}>{p === "fal" ? "Fal.ai" : "Replicate"}</button>
+              ))}
+            </div>
+            <div style={{ display: "flex", gap: theme.space.xs }}>
+              <input type="password" value={keyInput} onChange={(e) => setKeyInput(e.target.value)} placeholder={provider === "fal" ? "Fal key (fal.ai/dashboard/keys)" : "Replicate token (replicate.com/account)"} style={{ flex: 1, background: theme.color.base, color: theme.color.textPrimary, border: `1px solid ${theme.color.borderSubtle}`, borderRadius: theme.radius.sm, padding: "6px 8px", fontSize: theme.fontSize.smMd, fontFamily: theme.font.mono }} />
+              <button onClick={saveKey} style={{ padding: "6px 12px", borderRadius: theme.radius.sm, cursor: "pointer", border: `1px solid ${theme.color.borderPrimary}`, background: theme.color.raised, color: theme.color.textPrimary, fontSize: theme.fontSize.smMd }}>Save</button>
+            </div>
+            <span style={{ fontSize: theme.fontSize.xs, color: theme.color.textSecondary, lineHeight: 1.4 }}>
+              Runs on your account — pay per clip (~$0.02–0.10/video, ~$0.003–0.03/image). Key stays on this machine.
+            </span>
           </div>
 
           <div style={{ display: "flex", gap: theme.space.xs }}>
             {(["video", "image", "audio"] as Kind[]).map((k) => (
-              <button key={k} onClick={() => { setKind(k); setModel(MODELS[k][0].id); }} style={{ flex: 1, padding: `${theme.space.smMd}px`, borderRadius: theme.radius.sm, cursor: "pointer", textTransform: "capitalize", border: `1px solid ${kind === k ? theme.color.accent : theme.color.borderSubtle}`, background: kind === k ? theme.color.prominent : theme.color.base, color: kind === k ? theme.color.textPrimary : theme.color.textSecondary, fontSize: theme.fontSize.smMd }}>{k}</button>
+              <button key={k} onClick={() => setKind(k)} style={{ flex: 1, padding: `${theme.space.smMd}px`, borderRadius: theme.radius.sm, cursor: "pointer", textTransform: "capitalize", border: `1px solid ${kind === k ? theme.color.accent : theme.color.borderSubtle}`, background: kind === k ? theme.color.prominent : theme.color.base, color: kind === k ? theme.color.textPrimary : theme.color.textSecondary, fontSize: theme.fontSize.smMd }}>{k}</button>
             ))}
           </div>
 
           <div>
-            <div style={{ ...sectionLabelStyle, marginBottom: theme.space.sm }}>Model</div>
-            <select value={model} onChange={(e) => setModel(e.target.value)} style={{ width: "100%", background: theme.color.base, color: theme.color.textPrimary, border: `1px solid ${theme.color.borderPrimary}`, borderRadius: theme.radius.sm, padding: "7px 8px", fontSize: theme.fontSize.smMd }}>
-              {models.map((m) => <option key={m.id} value={m.id}>{m.label} — {m.note}</option>)}
-            </select>
-          </div>
-
-          <div>
             <div style={{ ...sectionLabelStyle, marginBottom: theme.space.sm }}>{kind === "audio" ? "Describe the sound" : `Describe the ${kind}`}</div>
-            <textarea value={prompt} onChange={(e) => setPrompt(e.target.value)} rows={3} placeholder={kind === "video" ? "A slow dolly across a neon-lit street at night…" : "…"} style={{ width: "100%", boxSizing: "border-box", background: theme.color.base, color: theme.color.textPrimary, border: `1px solid ${theme.color.borderSubtle}`, borderRadius: theme.radius.sm, padding: "8px 10px", fontSize: theme.fontSize.smMd, fontFamily: theme.font.ui, resize: "vertical" }} />
+            <textarea value={prompt} onChange={(e) => setPrompt(e.target.value)} rows={3} placeholder={kind === "video" ? "A slow dolly across a neon-lit street at night…" : kind === "image" ? "A misty pine forest at dawn, cinematic…" : "…"} style={{ width: "100%", boxSizing: "border-box", background: theme.color.base, color: theme.color.textPrimary, border: `1px solid ${theme.color.borderSubtle}`, borderRadius: theme.radius.sm, padding: "8px 10px", fontSize: theme.fontSize.smMd, fontFamily: theme.font.ui, resize: "vertical" }} />
           </div>
 
           {kind !== "audio" && (
@@ -94,10 +104,10 @@ export function GenerationPanel() {
             </div>
           )}
 
-          {status && <div style={{ fontSize: theme.fontSize.xs, color: theme.color.textSecondary, lineHeight: 1.5, background: theme.color.base, borderRadius: theme.radius.sm, padding: theme.space.md, border: `1px solid ${theme.color.borderSubtle}` }}>{status}</div>}
+          {status && <div style={{ fontSize: theme.fontSize.xs, color: statusColor, lineHeight: 1.5, background: theme.color.base, borderRadius: theme.radius.sm, padding: theme.space.md, border: `1px solid ${theme.color.borderSubtle}` }}>{status.text}</div>}
 
-          <button onClick={onGenerate} style={{ background: theme.color.accent, color: "#1a1a1a", border: "none", borderRadius: theme.radius.sm, padding: "10px", fontSize: theme.fontSize.md, fontWeight: 600, cursor: "pointer" }}>
-            ✨ Generate {kind}
+          <button onClick={onGenerate} disabled={busy} style={{ background: busy ? theme.color.raised : theme.color.accent, color: busy ? theme.color.textSecondary : "#1a1a1a", border: "none", borderRadius: theme.radius.sm, padding: "10px", fontSize: theme.fontSize.md, fontWeight: 600, cursor: busy ? "default" : "pointer" }}>
+            {busy ? "Generating…" : `✨ Generate ${kind}`}
           </button>
         </div>
       </div>

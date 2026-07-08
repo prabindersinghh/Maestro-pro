@@ -19,8 +19,9 @@ import { encodeManifest, decodeManifest } from "../model/media";
 import { probeMedia } from "./probe";
 import { SkillStore } from "./skills";
 import { extractWaveform, type WaveformEnvelope } from "../audio/waveform";
+import { generate, type GenConfig, type GenKind } from "../gen/hosted";
 import { join } from "node:path";
-import { mkdir } from "node:fs/promises";
+import { mkdir, writeFile } from "node:fs/promises";
 import { publicDir, remotionDir, dataDir } from "./env";
 import type { VideoCodec, VideoResolution } from "../render/renderVideo";
 
@@ -54,6 +55,8 @@ export class McpExecutor {
   readonly media: MediaLibrary;
   currentFrame = 0;
   canGenerate = false; // Windows port: no cloud account (SPEC §10)
+  /** BYOK hosted-generation config (Fal/Replicate), set by the app via /gen-config. */
+  genConfig: GenConfig | null = null;
   projectDir: string | null = null;
   private fs: PackageFS | null;
   private agentUndo: string[] = [];
@@ -207,6 +210,54 @@ export class McpExecutor {
     return okJson({ assetId: asset.id, name: asset.name, template, frames: res.durationInFrames, width: res.width, height: res.height, engine: "remotion", placed: place });
   }
 
+  // generate_video / generate_image (hosted, BYOK Fal/Replicate): call the provider, download the
+  // result, probe it, import it, and place it on the timeline. Same auto-import contract as the
+  // local generators above — so a clip the AI generates lands on the timeline in BOTH connect paths.
+  private async generateHosted(kind: GenKind, a: Args): Promise<ToolResult> {
+    const cfg = this.genConfig;
+    if (!cfg || !cfg.apiKey) {
+      return err(
+        "Generation needs your own Fal or Replicate key. Open Settings → Generation in Maestro and paste your key " +
+        "(pay-per-clip on your account: ~$0.02–0.10/video, ~$0.003–0.03/image). Then retry. This is a setup step, not a failure.",
+      );
+    }
+    const prompt = requireStr(a, "prompt");
+    const durationSeconds = aNum(a, "durationSeconds") ?? (kind === "video" ? 5 : 4);
+    const aspectRatio = aStr(a, "aspectRatio");
+
+    const res = await generate(cfg, kind, prompt, { durationSeconds, aspectRatio });
+
+    // Download to the generated/ folder so it survives as a real file the render pipeline can read.
+    const dir = join(dataDir(), "generated");
+    await mkdir(dir, { recursive: true });
+    const ext = kind === "video" ? "mp4" : (res.url.split("?")[0].match(/\.(png|jpe?g|webp)$/i)?.[1] ?? "png");
+    const outputPath = join(dir, `gen-${cryptoId()}.${ext}`);
+    const dl = await fetch(res.url);
+    if (!dl.ok) throw new ToolFail(`Download of generated ${kind} failed: HTTP ${dl.status}`);
+    await writeFile(outputPath, Buffer.from(await dl.arrayBuffer()));
+
+    const probe = await probeMedia(outputPath);
+    const type: ClipType = kind === "video" ? "video" : "image";
+    const asset = this.media.addAsset({
+      name: `${kind === "video" ? "Gen video" : "Gen image"}: ${prompt.slice(0, 24)}`,
+      type,
+      duration: probe?.duration ?? (kind === "image" ? durationSeconds : 0),
+      source: { kind: "external", absolutePath: outputPath },
+      sourceWidth: probe?.width, sourceHeight: probe?.height, sourceFPS: probe?.fps,
+      hasAudio: kind === "video" ? probe?.hasAudio ?? false : false,
+    });
+    this.stateVersion++;
+
+    const place = aBool(a, "place") !== false;
+    if (place) {
+      const dur = Math.max(1, Math.round((probe?.duration && kind === "video" ? probe.duration : durationSeconds) * this.fps));
+      const trackIndex = this.ensureTrack("video");
+      this.engine.addClips([{ mediaRef: asset.id, trackIndex, startFrame: this.currentFrame, durationFrames: dur, mediaType: type, sourceClipType: type }]);
+      this.track(true, kind === "video" ? "Generate Video" : "Generate Image");
+    }
+    return okJson({ assetId: asset.id, name: asset.name, kind, provider: cfg.provider, width: probe?.width, height: probe?.height, placed: place });
+  }
+
   async execute(name: string, args: Args): Promise<ToolResult> {
     const READ_ONLY = new Set([
       "get_timeline", "get_media", "inspect_media", "get_transcript", "inspect_timeline",
@@ -280,13 +331,13 @@ export class McpExecutor {
       case "set_project_settings": return this.setProjectSettings(a);
       case "list_models": return okJson({ models: [], loaded: false }); // signed-out shape
       case "send_feedback": return ok("Feedback recorded.");
-      // Generation — stub (signed-out)
-      case "generate_video":
-      case "generate_image":
+      // Generation — hosted (BYOK Fal/Replicate). generate_audio stays stubbed (no cheap hosted TTS wired).
+      case "generate_video": return this.generateHosted("video", a);
+      case "generate_image": return this.generateHosted("image", a);
       case "generate_audio":
-        return err("Generation requires signing in to Palmier. Tell the user to sign in.");
+        return err("generate_audio is not wired in this build. Use generate_title for animated text or import audio.");
       case "upscale_media":
-        return err("Upscale requires signing in to Palmier. Tell the user to sign in.");
+        return err("upscale_media is not wired in this build.");
       default:
         return err(`Unknown tool: ${name}`);
     }

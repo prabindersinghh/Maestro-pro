@@ -10,6 +10,7 @@ import { extname, join } from "node:path";
 import { ALL_TOOL_DEFS } from "./toolDefs";
 import { resolveRenderMediaPath } from "../render/mediaPath";
 import { publicDir } from "./env";
+import { DEFAULT_MODELS as DEFAULT_GEN_MODELS } from "../gen/hosted";
 import type { McpExecutor } from "./executor";
 
 export const MCP_PORT = 19789;
@@ -20,7 +21,9 @@ const SUPPORTED_PROTOCOLS = new Set(["2025-06-18", "2025-03-26", "2024-11-05", D
 
 const SERVER_INSTRUCTIONS =
   "Maestro MCP server (AI-native video editor). Call get_timeline at the start of a session. " +
-  "Generation and transcription tools are stubbed in this build (canGenerate is false).";
+  "generate_video/generate_image run on hosted providers (Fal/Replicate) when the user has added their key " +
+  "in Settings → Generation; if not set they return a clear setup message. generate_title/generate_motion " +
+  "render locally and always work. Transcription tools are stubbed in this build.";
 
 interface JsonRpcRequest {
   jsonrpc?: string;
@@ -79,6 +82,25 @@ export class McpServer {
         const body = JSON.parse((await readBodyBuffer(req)).toString("utf8"));
         const version = this.executor.setState(body.timeline, body.media);
         return sendJson(res, 200, { version }, CORS);
+      } catch (e) {
+        return sendJson(res, 400, { error: e instanceof Error ? e.message : String(e) }, CORS);
+      }
+    }
+    // Hosted-generation BYOK config. GET reports whether a key is set (never returns the key);
+    // POST sets provider/apiKey/models so generate_video/image work from BOTH connect paths.
+    if (path === "/gen-config" && req.method === "GET") {
+      const c = this.executor.genConfig;
+      return sendJson(res, 200, { provider: c?.provider ?? "fal", hasKey: !!c?.apiKey, videoModel: c?.videoModel, imageModel: c?.imageModel }, CORS);
+    }
+    if (path === "/gen-config" && req.method === "POST") {
+      try {
+        const b = JSON.parse((await readBodyBuffer(req)).toString("utf8")) as { provider?: string; apiKey?: string; videoModel?: string; imageModel?: string };
+        const provider = b.provider === "replicate" ? "replicate" : "fal";
+        const key = typeof b.apiKey === "string" ? b.apiKey.trim() : "";
+        this.executor.genConfig = key
+          ? { provider, apiKey: key, videoModel: b.videoModel?.trim() || DEFAULT_GEN_MODELS[provider].video, imageModel: b.imageModel?.trim() || DEFAULT_GEN_MODELS[provider].image }
+          : null;
+        return sendJson(res, 200, { ok: true, provider, hasKey: !!key }, CORS);
       } catch (e) {
         return sendJson(res, 400, { error: e instanceof Error ? e.message : String(e) }, CORS);
       }

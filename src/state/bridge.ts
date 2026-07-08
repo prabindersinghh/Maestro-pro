@@ -132,4 +132,31 @@ export class ProjectBridge {
     await this.poll();
     return assetId;
   }
+
+  /** Call any MCP tool from the UI, then pull the resulting state so edits show immediately. */
+  async callTool(name: string, args: unknown): Promise<Record<string, unknown>> {
+    const r = await fetch(`${BRIDGE_URL}/mcp`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ jsonrpc: "2.0", id: this.rpcId++, method: "tools/call", params: { name, arguments: args } }),
+    });
+    if (!r.ok) throw new Error(`${name} ${r.status}`);
+    const json = (await r.json()) as { result?: { isError?: boolean; content: { text: string }[] } };
+    const text = json.result?.content[0]?.text ?? "";
+    if (!json.result || json.result.isError) throw new Error(text || `${name} failed`);
+    await this.poll();
+    try { return JSON.parse(text) as Record<string, unknown>; } catch { return { text }; }
+  }
+
+  /** Save the hosted-generation BYOK config on the server (used by generate_video/image). */
+  async saveGenConfig(cfg: { provider: string; apiKey: string; videoModel?: string; imageModel?: string }): Promise<void> {
+    const r = await fetch(`${BRIDGE_URL}/gen-config`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(cfg) });
+    if (!r.ok) throw new Error((await r.json().catch(() => ({ error: `gen-config ${r.status}` }))).error ?? `gen-config ${r.status}`);
+  }
+
+  async genConfigStatus(): Promise<{ provider: string; hasKey: boolean }> {
+    const r = await fetch(`${BRIDGE_URL}/gen-config`);
+    if (!r.ok) return { provider: "fal", hasKey: false };
+    return (await r.json()) as { provider: string; hasKey: boolean };
+  }
 }

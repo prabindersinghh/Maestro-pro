@@ -54,6 +54,9 @@ export class EditorStore {
     model: lsGet("maestro.model") ?? "claude-sonnet-5",
     connectMode: (lsGet("maestro.connectMode") as "choose" | "inapp" | "claudecode") ?? "choose",
     showChat: false,
+    // Hosted-generation BYOK (Fal/Replicate). The key persists locally and is pushed to the server.
+    genProvider: (lsGet("maestro.genProvider") as "fal" | "replicate") ?? "fal",
+    genKey: lsGet("maestro.genKey") ?? "",
   };
   private listeners = new Set<() => void>();
   private version = 0;
@@ -91,7 +94,7 @@ export class EditorStore {
   startBridge(): void {
     if (this.bridge) return;
     this.bridge = new ProjectBridge(this);
-    void this.bridge.start();
+    void this.bridge.start().then(() => this.pushGenConfig());
   }
 
   serializeState(): { timeline: unknown; media: unknown } {
@@ -160,6 +163,24 @@ export class EditorStore {
   setConnectMode(m: "choose" | "inapp" | "claudecode"): void { this.settings.connectMode = m; lsSet("maestro.connectMode", m); this.emit(); }
   /** Pull the latest server state now (after the in-app agent runs a tool) so edits show instantly. */
   async syncNow(): Promise<void> { await this.bridge?.syncNow(); }
+
+  // --- hosted generation (BYOK) ---
+  setGenProvider(p: "fal" | "replicate"): void { this.settings.genProvider = p; lsSet("maestro.genProvider", p); this.emit(); }
+  /** Save the generation key locally + push it to the server so generate_video/image can use it. */
+  async saveGenKey(key: string): Promise<void> {
+    this.settings.genKey = key; lsSet("maestro.genKey", key);
+    await this.bridge?.saveGenConfig({ provider: this.settings.genProvider, apiKey: key });
+    this.emit();
+  }
+  /** Re-push the stored key to the server (called on startup so a fresh server picks it up). */
+  async pushGenConfig(): Promise<void> {
+    if (this.settings.genKey) await this.bridge?.saveGenConfig({ provider: this.settings.genProvider, apiKey: this.settings.genKey });
+  }
+  /** Run a generation tool (generate_video/generate_image) from the UI; result auto-imports+places. */
+  async generate(kind: "video" | "image", prompt: string, opts: { aspectRatio?: string; durationSeconds?: number } = {}): Promise<Record<string, unknown>> {
+    if (!this.bridge) throw new Error("Not connected to the Maestro server.");
+    return this.bridge.callTool(kind === "video" ? "generate_video" : "generate_image", { prompt, ...opts });
+  }
   setExportDefaults(p: { codec?: string; resolution?: string }): void {
     if (p.codec) this.settings.exportCodec = p.codec;
     if (p.resolution) this.settings.exportResolution = p.resolution;

@@ -77,16 +77,20 @@ describe("Stage-C: executor edit flow over the engine", () => {
 });
 
 describe("Stage-C: stub shapes (SPEC §10/§11)", () => {
-  it("generation tools return the signed-out shape", async () => {
+  it("generate_video/image ask for a BYOK key when none is set (no fake clip)", async () => {
     const ex = new McpExecutor();
-    for (const t of ["generate_video", "generate_image", "generate_audio"]) {
+    for (const t of ["generate_video", "generate_image"]) {
       const r = await ex.execute(t, { prompt: "x" });
       expect(r.isError).toBe(true);
-      expect(r.content[0].text).toMatch(/signing in to Palmier/);
+      expect(r.content[0].text).toMatch(/Fal or Replicate key/);
     }
+    // generate_audio + upscale stay unwired.
+    const au = await ex.execute("generate_audio", { prompt: "x" });
+    expect(au.isError).toBe(true);
+    expect(au.content[0].text).toMatch(/not wired/);
     const up = await ex.execute("upscale_media", { mediaRef: "x" });
     expect(up.isError).toBe(true);
-    expect(up.content[0].text).toMatch(/Upscale requires signing in/);
+    expect(up.content[0].text).toMatch(/not wired/);
   });
 
   it("list_models returns {models:[],loaded:false}", async () => {
