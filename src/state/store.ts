@@ -17,6 +17,9 @@ import { ProjectBridge, BRIDGE_URL } from "./bridge";
 import type { Clip, KeyframeValue, Timeline } from "../model/types";
 import { demoProject } from "./demoProject";
 
+const lsGet = (k: string): string | null => { try { return typeof localStorage !== "undefined" ? localStorage.getItem(k) : null; } catch { return null; } };
+const lsSet = (k: string, v: string): void => { try { if (typeof localStorage !== "undefined") localStorage.setItem(k, v); } catch { /* ignore */ } };
+
 const PROP_TO_KEY: Record<AnimatableProperty, keyof Clip> = {
   opacity: "opacityTrack", position: "positionTrack", scale: "scaleTrack",
   rotation: "rotationTrack", crop: "cropTrack", volume: "volumeTrack",
@@ -44,8 +47,14 @@ export class EditorStore {
   engine: EditEngine;
   media: MediaLibrary;
   view: ViewState;
-  /** App preferences (export defaults, UI). Not part of the .palmier project. */
-  settings = { exportCodec: "H.264", exportResolution: "1080p", showSettings: false, showGenerate: false };
+  /** App preferences (export defaults, AI connection, UI). Not part of the .palmier project. */
+  settings = {
+    exportCodec: "H.264", exportResolution: "1080p", showSettings: false, showGenerate: false,
+    apiKey: lsGet("maestro.apiKey") ?? "",
+    model: lsGet("maestro.model") ?? "claude-sonnet-5",
+    connectMode: (lsGet("maestro.connectMode") as "choose" | "inapp" | "claudecode") ?? "choose",
+    showChat: false,
+  };
   private listeners = new Set<() => void>();
   private version = 0;
 
@@ -145,6 +154,12 @@ export class EditorStore {
 
   openSettings(open: boolean): void { this.settings.showSettings = open; this.emit(); }
   openGenerate(open: boolean): void { this.settings.showGenerate = open; this.emit(); }
+  openChat(open: boolean): void { this.settings.showChat = open; this.emit(); }
+  setApiKey(k: string): void { this.settings.apiKey = k; lsSet("maestro.apiKey", k); this.emit(); }
+  setModel(m: string): void { this.settings.model = m; lsSet("maestro.model", m); this.emit(); }
+  setConnectMode(m: "choose" | "inapp" | "claudecode"): void { this.settings.connectMode = m; lsSet("maestro.connectMode", m); this.emit(); }
+  /** Pull the latest server state now (after the in-app agent runs a tool) so edits show instantly. */
+  async syncNow(): Promise<void> { await this.bridge?.syncNow(); }
   setExportDefaults(p: { codec?: string; resolution?: string }): void {
     if (p.codec) this.settings.exportCodec = p.codec;
     if (p.resolution) this.settings.exportResolution = p.resolution;

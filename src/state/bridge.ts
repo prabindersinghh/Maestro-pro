@@ -42,6 +42,9 @@ export class ProjectBridge {
     this.pollTimer = null;
   }
 
+  /** Force an immediate pull of server state (used after the in-app agent runs a tool). */
+  async syncNow(): Promise<void> { await this.poll(); }
+
   /** Called by the store on every local edit. */
   onLocalChange(): void {
     if (this.applying) return;

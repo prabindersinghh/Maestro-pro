@@ -769,4 +769,39 @@ clone: `cd remotion && npm install` once** (node_modules is gitignored).
 
 ---
 
+## Entry — 2026-07-08 · Connect-AI: two paths (in-app chat / Claude Code) + auto-import fix
+
+Built both ways to connect the AI with an in-app chooser, ported in spirit from Palmier's Agent/Panel
++ Agent/Clients/AnthropicClient.
+- **Connect-AI chooser** (Settings → Connect AI): two option cards with the tradeoff spelled out —
+  A) In-app chat (BYOK Anthropic key, chat in-window, attach files, live edits, small cost/use);
+  B) Claude Code (free w/ Claude plan, separate terminal, copy-paste MCP setup). Persists the choice.
+  `docs/screenshots/15-connect-chooser.png`, `16-connect-inapp.png`, `17-connect-claudecode.png`.
+- **Option A — in-app chat** (`src/agent/agent.ts` + `src/ui/ChatPanel.tsx`): a right-docked chat.
+  `MaestroAgent` runs Claude's tool-use loop from the webview — the LLM call hits the Anthropic
+  Messages API (BYOK, anthropic-dangerous-direct-browser-access) and every tool_use executes against
+  the SAME local MCP server the app is synced to; after each tool it calls `store.syncNow()` so edits
+  show live. Attach files → uploaded to the server (become assets) + images passed to the model. Key
+  stored in localStorage. `docs/screenshots/18-chat-panel.png`.
+- **Option B — Claude Code** guided setup: server status + 3 copy-paste steps (install / mcp add /
+  claude) with copy buttons.
+- **Auto-import fix + CORS fix**: `generate_title`/`generate_motion` already place the clip; but the
+  webview couldn't call `/mcp` (no CORS on the JSON-RPC responses) — **fixed** (CORS on every /mcp
+  response), which is what makes Option A work at all. In both paths a generated clip now lands on the
+  timeline + the UI updates immediately.
+
+### Gate — verified live (what a script can)
+- Chooser + both setup screens + chat panel render correctly (screenshots above).
+- **In-app tool→timeline path** (exactly what the agent does per tool_use): browser POST to `/mcp`
+  `generate_title` → clip **placed on the timeline** (0→1) → `syncNow` → preview shows "IN-APP TEST".
+  `docs/screenshots/19-inapp-clip-landed.png`.
+- Option B full loop already proven (MCP generate_* → clip on timeline).
+- 136 tests green, tsc clean.
+- **Not yet verified: Option A's Anthropic LLM call** — needs the user's *Anthropic* API key (only an
+  ElevenLabs key was provided). Everything around it (UI, tool loop, execution, auto-import, live
+  sync) is verified; paste an Anthropic key in Settings → Connect AI → In-app chat to do the final
+  prompt→clip test.
+
+---
+
 <!-- Append the next session's entry below this line. Keep newest at the bottom or top consistently. -->

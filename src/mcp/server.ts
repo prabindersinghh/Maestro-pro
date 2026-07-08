@@ -118,25 +118,26 @@ export class McpServer {
       return;
     }
 
-    // POST: validation pipeline (origin → content-type → protocol version).
+    // POST: validation pipeline (origin → content-type → protocol version). CORS on every response
+    // so the in-app chat (webview on :1420) can call /mcp directly, same as CLI clients.
     const originErr = validateOrigin(req);
-    if (originErr) return sendJson(res, 403, rpcError(null, -32600, originErr));
+    if (originErr) return sendJson(res, 403, rpcError(null, -32600, originErr), CORS);
     const ctErr = validateContentType(req);
-    if (ctErr) return sendJson(res, 415, rpcError(null, -32600, ctErr));
+    if (ctErr) return sendJson(res, 415, rpcError(null, -32600, ctErr), CORS);
     const pvErr = validateProtocol(req);
-    if (pvErr) return sendJson(res, 400, rpcError(null, -32600, pvErr));
+    if (pvErr) return sendJson(res, 400, rpcError(null, -32600, pvErr), CORS);
 
     let body: string;
     try {
       body = await readBody(req);
     } catch {
-      return sendJson(res, 400, rpcError(null, -32700, "Failed to read request body"));
+      return sendJson(res, 400, rpcError(null, -32700, "Failed to read request body"), CORS);
     }
     let parsed: unknown;
     try {
       parsed = JSON.parse(body);
     } catch {
-      return sendJson(res, 400, rpcError(null, -32700, "Parse error"));
+      return sendJson(res, 400, rpcError(null, -32700, "Parse error"), CORS);
     }
 
     // Support single or batched JSON-RPC.
@@ -147,10 +148,10 @@ export class McpServer {
       if (reply !== null) responses.push(reply);
     }
     if (responses.length === 0) {
-      res.writeHead(202).end(); // notifications only
+      res.writeHead(202, CORS).end(); // notifications only
       return;
     }
-    return sendJson(res, 200, Array.isArray(parsed) ? responses : responses[0]);
+    return sendJson(res, 200, Array.isArray(parsed) ? responses : responses[0], CORS);
   }
 
   /** Stream a media asset's bytes to the webview (preview source). Supports Range for seeking. */

@@ -73,28 +73,107 @@ const selectStyle: React.CSSProperties = {
 };
 
 function ConnectTab({ connected }: { connected: boolean }) {
-  const [copied, setCopied] = useState(false);
-  const copy = async () => { try { await navigator.clipboard.writeText(CONNECT_CMD); setCopied(true); setTimeout(() => setCopied(false), 1500); } catch { /* clipboard blocked */ } };
+  const mode = store.settings.connectMode;
+  if (mode === "inapp") return <InAppSetup />;
+  if (mode === "claudecode") return <ClaudeCodeSetup connected={connected} />;
+  return <ConnectChooser />;
+}
+
+function ConnectChooser() {
+  const Card = ({ badge, title, sub, points, onPick, cta }: { badge: string; title: string; sub: string; points: string[]; onPick: () => void; cta: string }) => (
+    <div style={{ flex: 1, border: `1px solid ${theme.color.borderPrimary}`, borderRadius: theme.radius.md, padding: theme.space.lg, display: "flex", flexDirection: "column", background: theme.color.base }}>
+      <span style={{ fontSize: theme.fontSize.xxs, textTransform: "uppercase", letterSpacing: 0.6, color: theme.color.accent }}>{badge}</span>
+      <div style={{ fontSize: theme.fontSize.mdLg, fontWeight: 700, marginTop: 4 }}>{title}</div>
+      <div style={{ fontSize: theme.fontSize.xs, color: theme.color.textTertiary, marginBottom: theme.space.smMd }}>{sub}</div>
+      <ul style={{ margin: 0, paddingLeft: 16, color: theme.color.textSecondary, fontSize: theme.fontSize.smMd, lineHeight: 1.6, flex: 1 }}>
+        {points.map((p, i) => <li key={i}>{p}</li>)}
+      </ul>
+      <button onClick={onPick} style={{ marginTop: theme.space.mdLg, background: theme.color.accent, color: "#1a1a1a", border: "none", borderRadius: theme.radius.sm, padding: "8px", fontSize: theme.fontSize.smMd, fontWeight: 600, cursor: "pointer" }}>{cta}</button>
+    </div>
+  );
   return (
     <div>
-      <div style={{ display: "flex", alignItems: "center", gap: theme.space.sm, marginBottom: theme.space.lg }}>
+      <div style={{ fontSize: theme.fontSize.smMd, color: theme.color.textSecondary, marginBottom: theme.space.lg, lineHeight: 1.6 }}>
+        Two ways to let AI edit your timeline. Pick one — you can switch later.
+      </div>
+      <div style={{ display: "flex", gap: theme.space.mdLg }}>
+        <Card
+          badge="Option A · Best experience"
+          title="In-app chat"
+          sub="Uses your own Anthropic API key"
+          points={["Chat right inside Maestro", "Attach files, edits happen live in the window", "Small cost per use (billed to your API key)"]}
+          onPick={() => store.setConnectMode("inapp")}
+          cta="Set up in-app chat"
+        />
+        <Card
+          badge="Option B · Free"
+          title="Claude Code"
+          sub="For users on a Claude subscription"
+          points={["Free with your Claude plan", "Runs in a separate terminal window", "Connects over MCP; edits still show live here"]}
+          onPick={() => store.setConnectMode("claudecode")}
+          cta="Set up Claude Code"
+        />
+      </div>
+    </div>
+  );
+}
+
+function BackLink() {
+  return <button onClick={() => store.setConnectMode("choose")} style={{ background: "transparent", border: "none", color: theme.color.textTertiary, cursor: "pointer", fontSize: theme.fontSize.xs, padding: 0, marginBottom: theme.space.md }}>← other options</button>;
+}
+
+function InAppSetup() {
+  const [key, setKey] = useState(store.settings.apiKey);
+  const saved = store.settings.apiKey.trim().length > 0;
+  return (
+    <div>
+      <BackLink />
+      <div style={{ ...sectionLabelStyle, marginBottom: theme.space.smMd }}>In-app chat — Anthropic API key</div>
+      <div style={{ fontSize: theme.fontSize.smMd, color: theme.color.textSecondary, lineHeight: 1.6, marginBottom: theme.space.mdLg }}>
+        Paste your Anthropic key (from <span style={{ fontFamily: theme.font.mono }}>console.anthropic.com</span>). Stored locally in this app only. This uses your own key — a small cost per use.
+      </div>
+      <div style={{ display: "flex", gap: theme.space.sm, marginBottom: theme.space.mdLg }}>
+        <input type="password" value={key} onChange={(e) => setKey(e.target.value)} placeholder="sk-ant-…"
+          style={{ flex: 1, background: theme.color.base, color: theme.color.textPrimary, border: `1px solid ${theme.color.borderSubtle}`, borderRadius: theme.radius.sm, padding: "7px 9px", fontSize: theme.fontSize.smMd, fontFamily: theme.font.mono }} />
+        <button onClick={() => store.setApiKey(key.trim())} style={{ background: theme.color.accent, color: "#1a1a1a", border: "none", borderRadius: theme.radius.sm, padding: "0 14px", fontSize: theme.fontSize.smMd, fontWeight: 600, cursor: "pointer" }}>Save</button>
+      </div>
+      <Field label="Model">
+        <select style={selectStyle} value={store.settings.model} onChange={(e) => store.setModel(e.target.value)}>
+          {["claude-sonnet-5", "claude-opus-4-8", "claude-haiku-4-5-20251001"].map((m) => <option key={m} value={m}>{m}</option>)}
+        </select>
+      </Field>
+      {saved && (
+        <button onClick={() => { store.openSettings(false); store.openChat(true); }} style={{ marginTop: theme.space.md, background: theme.color.prominent, color: theme.color.textPrimary, border: `1px solid ${theme.color.borderPrimary}`, borderRadius: theme.radius.sm, padding: "8px 14px", fontSize: theme.fontSize.smMd, fontWeight: 600, cursor: "pointer" }}>Open chat →</button>
+      )}
+    </div>
+  );
+}
+
+function ClaudeCodeSetup({ connected }: { connected: boolean }) {
+  const [copied, setCopied] = useState("");
+  const copy = async (cmd: string, tag: string) => { try { await navigator.clipboard.writeText(cmd); setCopied(tag); setTimeout(() => setCopied(""), 1500); } catch { /* blocked */ } };
+  const Cmd = ({ cmd, tag }: { cmd: string; tag: string }) => (
+    <div style={{ display: "flex", alignItems: "center", gap: theme.space.sm, marginBottom: theme.space.sm }}>
+      <code style={{ flex: 1, background: theme.color.base, border: `1px solid ${theme.color.borderSubtle}`, borderRadius: theme.radius.sm, padding: "7px 9px", fontFamily: theme.font.mono, fontSize: theme.fontSize.sm, color: theme.color.textPrimary, overflowX: "auto", whiteSpace: "nowrap" }}>{cmd}</code>
+      <button onClick={() => copy(cmd, tag)} style={{ background: theme.color.accent, color: "#1a1a1a", border: "none", borderRadius: theme.radius.sm, padding: "7px 12px", fontSize: theme.fontSize.sm, fontWeight: 600, cursor: "pointer" }}>{copied === tag ? "✓" : "Copy"}</button>
+    </div>
+  );
+  return (
+    <div>
+      <BackLink />
+      <div style={{ display: "flex", alignItems: "center", gap: theme.space.sm, marginBottom: theme.space.mdLg }}>
         <span style={{ width: 9, height: 9, borderRadius: 5, background: connected ? theme.color.success : "#e0a63b" }} />
-        <span style={{ fontSize: theme.fontSize.md }}>{connected ? "Project server running" : "Project server offline"}</span>
+        <span style={{ fontSize: theme.fontSize.smMd }}>{connected ? "Project server running" : "Project server offline — run npm run mcp"}</span>
         <span style={{ fontFamily: theme.font.mono, fontSize: theme.fontSize.xs, color: theme.color.textMuted, marginLeft: "auto" }}>{MCP_URL}</span>
       </div>
-
-      <div style={{ ...sectionLabelStyle, marginBottom: theme.space.smMd }}>Connect Claude</div>
-      <ol style={{ margin: 0, paddingLeft: 18, color: theme.color.textSecondary, fontSize: theme.fontSize.smMd, lineHeight: 1.7 }}>
-        <li>Install Claude Code (<span style={{ fontFamily: theme.font.mono }}>npm i -g @anthropic-ai/claude-code</span>).</li>
-        <li>Run the command below in a terminal to connect it to Maestro.</li>
-        <li>Start <span style={{ fontFamily: theme.font.mono }}>claude</span> and ask it to edit your timeline — changes appear here live.</li>
-      </ol>
-
-      <div style={{ marginTop: theme.space.mdLg, display: "flex", alignItems: "center", gap: theme.space.sm }}>
-        <code style={{ flex: 1, background: theme.color.base, border: `1px solid ${theme.color.borderSubtle}`, borderRadius: theme.radius.sm, padding: "8px 10px", fontFamily: theme.font.mono, fontSize: theme.fontSize.sm, color: theme.color.textPrimary, overflowX: "auto", whiteSpace: "nowrap" }}>{CONNECT_CMD}</code>
-        <button onClick={copy} style={{ background: theme.color.accent, color: "#1a1a1a", border: "none", borderRadius: theme.radius.sm, padding: "8px 14px", fontSize: theme.fontSize.smMd, fontWeight: 600, cursor: "pointer" }}>{copied ? "Copied" : "Copy"}</button>
-      </div>
-      <div style={{ marginTop: theme.space.md, fontSize: theme.fontSize.xs, color: theme.color.textMuted }}>Local only — the server listens on 127.0.0.1 and is not exposed to the network.</div>
+      <div style={{ fontSize: theme.fontSize.smMd, color: theme.color.textSecondary, marginBottom: theme.space.mdLg }}>Free with your Claude plan. Runs in a separate terminal; edits still appear here live.</div>
+      <div style={{ ...sectionLabelStyle, marginBottom: theme.space.sm }}>1 · Install Claude Code (once)</div>
+      <Cmd cmd="npm i -g @anthropic-ai/claude-code" tag="install" />
+      <div style={{ ...sectionLabelStyle, margin: `${theme.space.md}px 0 ${theme.space.sm}px` }}>2 · Connect it to Maestro</div>
+      <Cmd cmd={CONNECT_CMD} tag="add" />
+      <div style={{ ...sectionLabelStyle, margin: `${theme.space.md}px 0 ${theme.space.sm}px` }}>3 · Start Claude and prompt it</div>
+      <Cmd cmd="claude" tag="run" />
+      <div style={{ marginTop: theme.space.md, fontSize: theme.fontSize.xs, color: theme.color.textMuted }}>Local only — the server listens on 127.0.0.1. Then ask e.g. “add an animated intro that says Trip 2026”.</div>
     </div>
   );
 }

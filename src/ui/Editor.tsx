@@ -7,6 +7,7 @@ import { Inspector } from "./Inspector";
 import { MediaPanel } from "./MediaPanel";
 import { Settings } from "./Settings";
 import { GenerationPanel } from "./GenerationPanel";
+import { ChatPanel } from "./ChatPanel";
 import { exportVideoFromUI } from "./exportVideo";
 import { previewAudio } from "../audio/previewAudio";
 
@@ -147,10 +148,14 @@ export function Editor() {
         <div style={{ flex: 1 }} />
         {exportMsg && <span style={{ fontSize: theme.fontSize.xs, color: theme.color.textTertiary, maxWidth: 240, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{exportMsg}</span>}
         <button
-          onClick={() => store.openSettings(true)} title="Connect Claude over MCP"
-          style={{ background: "transparent", color: theme.color.textSecondary, border: `1px solid ${theme.color.borderSubtle}`, borderRadius: theme.radius.sm, padding: "6px 12px", fontSize: theme.fontSize.smMd, cursor: "pointer", fontFamily: theme.font.ui, display: "flex", alignItems: "center", gap: 6 }}
+          onClick={() => {
+            if (store.settings.connectMode === "inapp" && store.settings.apiKey.trim()) store.openChat(!store.settings.showChat);
+            else store.openSettings(true);
+          }}
+          title="Connect / open AI"
+          style={{ background: store.settings.showChat ? theme.color.prominent : "transparent", color: theme.color.textSecondary, border: `1px solid ${theme.color.borderSubtle}`, borderRadius: theme.radius.sm, padding: "6px 12px", fontSize: theme.fontSize.smMd, cursor: "pointer", fontFamily: theme.font.ui, display: "flex", alignItems: "center", gap: 6 }}
         >
-          <span style={{ width: 7, height: 7, borderRadius: 4, background: store.bridge?.connected ? theme.color.success : "#e0a63b" }} /> Connect AI
+          <span style={{ width: 7, height: 7, borderRadius: 4, background: store.bridge?.connected ? theme.color.success : "#e0a63b" }} /> {store.settings.connectMode === "inapp" && store.settings.apiKey.trim() ? "AI Chat" : "Connect AI"}
         </button>
         <button
           onClick={() => store.openSettings(true)} title="Settings"
@@ -190,6 +195,7 @@ export function Editor() {
           </div>
         </div>
         <Inspector />
+        <ChatPanel />
       </div>
 
       {/* Timeline toolbar + tracks */}
