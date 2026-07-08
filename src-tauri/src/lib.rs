@@ -38,6 +38,26 @@ fn export_video(project_json: String, out_path: String, codec: String, resolutio
     }
 }
 
+/// One-click Option B: open a new terminal window that connects Claude Code to Maestro's MCP server
+/// and launches it. `& claude` runs even if the server was already added.
+#[tauri::command]
+fn launch_claude_code() -> Result<String, String> {
+    let connect = "claude mcp add --transport http palmier-pro http://127.0.0.1:19789/mcp & claude";
+    #[cfg(target_os = "windows")]
+    {
+        Command::new("cmd")
+            .args(["/c", "start", "Maestro — Claude Code", "cmd", "/k", connect])
+            .spawn()
+            .map_err(|e| format!("failed to open terminal: {e}"))?;
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        let _ = connect;
+        return Err("Launch is only wired for Windows in this build.".into());
+    }
+    Ok("launched".into())
+}
+
 /// Spawn the project/MCP server (shared state + media + Claude's MCP endpoint) as a child.
 /// If port 19789 is already taken (server running externally), the child exits harmlessly.
 fn spawn_project_server() {
@@ -64,7 +84,7 @@ pub fn run() {
             spawn_project_server();
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![export_video])
+        .invoke_handler(tauri::generate_handler![export_video, launch_claude_code])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

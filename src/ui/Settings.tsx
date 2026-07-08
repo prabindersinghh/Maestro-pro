@@ -149,6 +149,38 @@ function InAppSetup() {
   );
 }
 
+function LaunchButton() {
+  const [status, setStatus] = useState<string | null>(null);
+  const inTauri = "__TAURI_INTERNALS__" in globalThis;
+  const launch = async () => {
+    setStatus("Opening a terminal…");
+    try {
+      const { invoke } = await import("@tauri-apps/api/core");
+      await invoke("launch_claude_code");
+      setStatus("A terminal opened — Claude is connecting to Maestro. Edits will appear here live.");
+    } catch (e) {
+      setStatus(`Couldn't launch: ${e instanceof Error ? e.message : String(e)}. Make sure Claude Code is installed (see manual steps).`);
+    }
+  };
+  return (
+    <div>
+      <button
+        onClick={launch} disabled={!inTauri}
+        title={inTauri ? "Open a terminal with Claude Code connected" : "Available in the Maestro app"}
+        style={{ width: "100%", background: inTauri ? theme.color.accent : theme.color.raised, color: inTauri ? "#1a1a1a" : theme.color.textMuted, border: "none", borderRadius: theme.radius.sm, padding: "11px", fontSize: theme.fontSize.md, fontWeight: 700, cursor: inTauri ? "pointer" : "default" }}
+      >
+        🚀 Launch Claude Code (connected)
+      </button>
+      <div style={{ marginTop: theme.space.sm, fontSize: theme.fontSize.xs, color: theme.color.textMuted }}>
+        {inTauri
+          ? "One click — opens a terminal, connects to Maestro, and starts Claude. Requires Claude Code installed (npm i -g @anthropic-ai/claude-code)."
+          : "The launch button runs in the Maestro desktop app. In a browser, use the manual steps below."}
+      </div>
+      {status && <div style={{ marginTop: theme.space.sm, fontSize: theme.fontSize.xs, color: theme.color.textSecondary, lineHeight: 1.5 }}>{status}</div>}
+    </div>
+  );
+}
+
 function ClaudeCodeSetup({ connected }: { connected: boolean }) {
   const [copied, setCopied] = useState("");
   const copy = async (cmd: string, tag: string) => { try { await navigator.clipboard.writeText(cmd); setCopied(tag); setTimeout(() => setCopied(""), 1500); } catch { /* blocked */ } };
@@ -167,12 +199,18 @@ function ClaudeCodeSetup({ connected }: { connected: boolean }) {
         <span style={{ fontFamily: theme.font.mono, fontSize: theme.fontSize.xs, color: theme.color.textMuted, marginLeft: "auto" }}>{MCP_URL}</span>
       </div>
       <div style={{ fontSize: theme.fontSize.smMd, color: theme.color.textSecondary, marginBottom: theme.space.mdLg }}>Free with your Claude plan. Runs in a separate terminal; edits still appear here live.</div>
-      <div style={{ ...sectionLabelStyle, marginBottom: theme.space.sm }}>1 · Install Claude Code (once)</div>
-      <Cmd cmd="npm i -g @anthropic-ai/claude-code" tag="install" />
-      <div style={{ ...sectionLabelStyle, margin: `${theme.space.md}px 0 ${theme.space.sm}px` }}>2 · Connect it to Maestro</div>
-      <Cmd cmd={CONNECT_CMD} tag="add" />
-      <div style={{ ...sectionLabelStyle, margin: `${theme.space.md}px 0 ${theme.space.sm}px` }}>3 · Start Claude and prompt it</div>
-      <Cmd cmd="claude" tag="run" />
+      <LaunchButton />
+      <details style={{ marginTop: theme.space.mdLg }}>
+        <summary style={{ cursor: "pointer", fontSize: theme.fontSize.xs, color: theme.color.textTertiary }}>or do it manually (copy the 3 steps)</summary>
+        <div style={{ marginTop: theme.space.md }}>
+          <div style={{ ...sectionLabelStyle, marginBottom: theme.space.sm }}>1 · Install Claude Code (once)</div>
+          <Cmd cmd="npm i -g @anthropic-ai/claude-code" tag="install" />
+          <div style={{ ...sectionLabelStyle, margin: `${theme.space.md}px 0 ${theme.space.sm}px` }}>2 · Connect it to Maestro</div>
+          <Cmd cmd={CONNECT_CMD} tag="add" />
+          <div style={{ ...sectionLabelStyle, margin: `${theme.space.md}px 0 ${theme.space.sm}px` }}>3 · Start Claude and prompt it</div>
+          <Cmd cmd="claude" tag="run" />
+        </div>
+      </details>
       <div style={{ marginTop: theme.space.md, fontSize: theme.fontSize.xs, color: theme.color.textMuted }}>Local only — the server listens on 127.0.0.1. Then ask e.g. “add an animated intro that says Trip 2026”.</div>
     </div>
   );
