@@ -43,10 +43,11 @@ describe("Stage-C: MCP HTTP transport (palmier-pro on 127.0.0.1)", () => {
     // The frozen 41 parity tools are all still advertised.
     for (const n of TOOL_NAMES) expect(names).toContain(n);
     expect(names).toContain("get_timeline");
-    // Plus the two Maestro Skills-system extensions.
+    // Plus the Maestro extensions: Skills + motion graphics.
     expect(names).toContain("read_skill");
     expect(names).toContain("list_skills");
-    expect(json.result.tools.length).toBe(43);
+    expect(names).toContain("generate_title");
+    expect(json.result.tools.length).toBe(44);
   });
 
   it("tools/call get_timeline returns canGenerate:false", async () => {

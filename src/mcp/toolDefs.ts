@@ -717,7 +717,27 @@ export const SKILL_TOOL_DEFS: ToolDef[] = [
   },
 ];
 
-/** Tools advertised over MCP: the frozen 41 plus the Skills extension. */
-export const ALL_TOOL_DEFS: ToolDef[] = [...TOOL_DEFS, ...SKILL_TOOL_DEFS];
+// Motion-graphics extension (STRATEGY ②) — NOT part of the frozen 41. Renders an animated title/
+// intro/lower-third to MP4 locally (canvas + FFmpeg, no GPU/key) and imports it onto the timeline.
+export const MOTION_TOOL_DEFS: ToolDef[] = [
+  {
+    name: "generate_title",
+    description: "Generate an ANIMATED title / intro / lower-third card as a real MP4 (rendered locally — no GPU, no API key) and add it to the project. Map the user's request to the params: their words → `text` (+ optional `subtitle`), the vibe → `preset` and `background`/`accent`. By default it's placed at the playhead; pass place=false to only add it to the media library. Use this for animated titles, intros, outros, and lower-thirds — the fast path Palmier has no equivalent for.",
+    inputSchema: obj({
+      text: str("The title text (required)."),
+      subtitle: str("Optional smaller second line."),
+      preset: enumStr(["fadeSlideUp", "scaleIn", "typewriter", "wordReveal", "lowerThird"], "Animation style. Default fadeSlideUp."),
+      background: str("'black' | 'gradient' | 'spotlight' | a hex like '#101820'. Default gradient. (lowerThird ignores it.)"),
+      accent: str("Accent hex for gradient/spotlight/lower-third bar, e.g. '#1db26b'."),
+      color: str("Text hex, default white."),
+      fontSize: int("Title size in px at 1080p (scaled to project height). Default 120."),
+      durationSeconds: num("Length in seconds. Default 3."),
+      place: bool("Place at the playhead (default true). false = only import to the media library."),
+    }, ["text"]),
+  },
+];
+
+/** Tools advertised over MCP: the frozen 41 plus the Skills + Motion extensions. */
+export const ALL_TOOL_DEFS: ToolDef[] = [...TOOL_DEFS, ...SKILL_TOOL_DEFS, ...MOTION_TOOL_DEFS];
 
 export const TOOL_NAMES = TOOL_DEFS.map((t) => t.name);

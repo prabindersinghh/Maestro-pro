@@ -705,4 +705,32 @@ anyway — editable text clips vs burned-in). Fixing video-use's Windows paths i
 
 ---
 
+## Entry — 2026-07-06 · STRATEGY ② motion graphics — animated titles (piece 1), live
+
+The other big thing Palmier lacks. Engine decision (flagged to user): built on **@napi-rs/canvas +
+FFmpeg** (the render stack we already have) instead of a heavy Remotion project — zero-install,
+deterministic, fast, fully local (no GPU, no key). Remotion can be added later as a 2nd engine for
+complex React compositions.
+- `src/motion/renderTitle.ts` — draws each frame with canvas (presets: fadeSlideUp, scaleIn,
+  typewriter, wordReveal, lowerThird; easing; in/hold/out timing; gradient/spotlight/solid bg,
+  accent, subtitle) → pipes to FFmpeg → H.264 MP4.
+- `generate_title` MCP tool (Maestro extension, **44 tools** now = 41 + read_skill/list_skills +
+  generate_title). Claude maps a prompt → params, it renders locally, imports via the media library,
+  and (by default) places at the playhead. `place=false` to only import.
+
+### Gate — verified over MCP + the rendered frame
+- `generate_title("TRIP 2026", subtitle "summer cut", scaleIn, spotlight)` → **90 frames 1920×1080
+  H.264**, imported as "Title: TRIP 2026", `get_timeline` shows it **placed on the timeline** (1 clip,
+  asset matched). Rendered frame (mid): bold white title + subtitle on a green spotlight gradient —
+  `docs/screenshots/12-motion-title.png`; mid-frame has 21,543 white text px.
+- 136 tests green, tsc clean.
+- **In-app screenshot (title clip on Maestro's timeline + preview) pending** — the Playwright MCP
+  server was disconnected this turn; the render + placement are verified over MCP and the frame above.
+
+Next motion pieces (one at a time): transitions (crossfade/wipe between clips), intro/outro templates,
+transparent lower-thirds (WebM alpha). STRATEGY ③ (LTX-2 generation) still deferred — will check the
+user's GPU + local-vs-hosted cost first.
+
+---
+
 <!-- Append the next session's entry below this line. Keep newest at the bottom or top consistently. -->

@@ -6,3 +6,4 @@ dist-ssr
 
 # Rust / Tauri
 src-tauri/target
+generated/

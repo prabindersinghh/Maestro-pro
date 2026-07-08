@@ -20,6 +20,7 @@ import { probeMedia } from "./probe";
 import { SkillStore } from "./skills";
 import { extractWaveform, type WaveformEnvelope } from "../audio/waveform";
 import { join } from "node:path";
+import { mkdir } from "node:fs/promises";
 import type { VideoCodec, VideoResolution } from "../render/renderVideo";
 
 export interface ToolContentText { type: "text"; text: string }
@@ -132,6 +133,46 @@ export class McpExecutor {
     return okJson({ assetId: asset.id, name: asset.name, type: asset.type, duration: asset.duration });
   }
 
+  // generate_title (motion graphics): render an animated title MP4 locally, import it, place it.
+  private async generateTitle(a: Args): Promise<ToolResult> {
+    const text = requireStr(a, "text");
+    const durationSeconds = aNum(a, "durationSeconds") ?? 3;
+    const dir = join(process.cwd(), "generated");
+    await mkdir(dir, { recursive: true });
+    const id = cryptoId();
+    const outputPath = join(dir, `title-${id}.mp4`);
+    const { renderTitle } = await import("../motion/renderTitle");
+    await renderTitle({
+      text,
+      subtitle: aStr(a, "subtitle"),
+      preset: aStr(a, "preset") as "fadeSlideUp" | undefined,
+      background: aStr(a, "background"),
+      accent: aStr(a, "accent"),
+      color: aStr(a, "color"),
+      fontSize: aInt(a, "fontSize"),
+      durationSeconds,
+      width: this.timeline.width,
+      height: this.timeline.height,
+      fps: this.fps,
+      outputPath,
+    });
+    const asset = this.media.addAsset({
+      name: `Title: ${text.slice(0, 28)}`, type: "video", duration: durationSeconds,
+      source: { kind: "external", absolutePath: outputPath },
+      sourceWidth: this.timeline.width, sourceHeight: this.timeline.height, sourceFPS: this.fps, hasAudio: false,
+    });
+    this.stateVersion++;
+    const place = aBool(a, "place") !== false;
+    if (place) {
+      const start = this.currentFrame;
+      const dur = Math.max(1, Math.round(durationSeconds * this.fps));
+      const trackIndex = this.ensureTrack("video");
+      this.engine.addClips([{ mediaRef: asset.id, trackIndex, startFrame: start, durationFrames: dur, mediaType: "video", sourceClipType: "video" }]);
+      this.track(true, "Generate Title");
+    }
+    return okJson({ assetId: asset.id, name: asset.name, frames: Math.round(durationSeconds * this.fps), width: this.timeline.width, height: this.timeline.height, placed: place });
+  }
+
   async execute(name: string, args: Args): Promise<ToolResult> {
     const READ_ONLY = new Set([
       "get_timeline", "get_media", "inspect_media", "get_transcript", "inspect_timeline",
@@ -159,6 +200,8 @@ export class McpExecutor {
         const body = await this.skills.body(id);
         return body ? ok(body) : err(`Unknown skill: ${id}. Call list_skills to see available skills.`);
       }
+      // Motion graphics (Maestro extension)
+      case "generate_title": return this.generateTitle(a);
       // Read
       case "get_timeline": return this.getTimeline(a);
       case "get_media": return okJson({ media: this.media.mediaRows() });
