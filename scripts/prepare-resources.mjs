@@ -35,8 +35,13 @@ cpSync(path.join(root, "dist-server"), path.join(res, "dist-server"), { recursiv
 // 4) Bundled sample media (served + demo).
 cpSync(path.join(root, "public"), path.join(res, "public"), { recursive: true });
 
-// 5) Native canvas package (external in the bundle).
-cpSync(path.join(root, "node_modules", "@napi-rs", "canvas"), path.join(res, "node_modules", "@napi-rs", "canvas"), { recursive: true });
+// 5) Native canvas package + its platform binary package (the .node lives in a SEPARATE
+//    @napi-rs/canvas-<platform> package that the loader requires — copy every @napi-rs/canvas*).
+import { readdirSync } from "node:fs";
+const napiDir = path.join(root, "node_modules", "@napi-rs");
+for (const pkg of readdirSync(napiDir).filter((n) => n.startsWith("canvas"))) {
+  cpSync(path.join(napiDir, pkg), path.join(res, "node_modules", "@napi-rs", pkg), { recursive: true });
+}
 
 // 6) Remotion workspace SOURCE only (node_modules installed on first use into the writable data dir).
 cpSync(path.join(root, "remotion"), path.join(res, "remotion"), {
