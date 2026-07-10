@@ -44,6 +44,8 @@ fn apply_env(cmd: &mut Command, p: &Packaged) {
         .env("MAESTRO_PUBLIC_DIR", p.res.join("public"))
         .env("MAESTRO_REMOTION_DIR", p.res.join("remotion"))
         .env("MAESTRO_SKILLS_DIR", p.res.join("skills"))
+        .env("MAESTRO_WHISPER", p.res.join("whisper").join("whisper-cli.exe"))
+        .env("MAESTRO_MODELS_DIR", p.data.join("models"))
         .env("MAESTRO_DATA_DIR", &p.data)
         .env("NODE_PATH", p.res.join("node_modules"));
 }

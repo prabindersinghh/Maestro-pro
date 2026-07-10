@@ -52,8 +52,11 @@ cpSync(path.join(root, "remotion"), path.join(res, "remotion"), {
 // 7) Bundled skill library (Maestro's own editing playbooks — served by read_skill offline).
 cpSync(path.join(root, "skills"), path.join(res, "skills"), { recursive: true });
 
+// 8) Bundled whisper.cpp CLI (on-device transcription). The model .bin downloads on first use.
+cpSync(path.join(root, "vendor", "whisper"), path.join(res, "whisper"), { recursive: true });
+
 console.log("resources assembled:");
 console.log(`  node.exe     ${mb(path.join(res, "node.exe"))} MB`);
 console.log(`  ffmpeg.exe   ${mb(path.join(res, "ffmpeg.exe"))} MB`);
 console.log(`  ffprobe.exe  ${mb(path.join(res, "ffprobe.exe"))} MB`);
-console.log(`  + dist-server, public, @napi-rs/canvas, remotion(source), skills`);
+console.log(`  + dist-server, public, @napi-rs/canvas, remotion(source), skills, whisper`);

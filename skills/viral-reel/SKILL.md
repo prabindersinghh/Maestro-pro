@@ -9,6 +9,12 @@ FIRST, follow the house rule in the `build-in-maestro` skill: build everything O
 
 Your job: take what's on the timeline and turn it into a short-form vertical video that earns attention in the first 3 seconds and keeps it. Work in passes, visibly. Call `get_timeline` and `get_media` first so you know what you're working with.
 
+## 0. Understand the footage FIRST (perception)
+Don't edit blind. Before cutting, actually look and listen:
+- **Watch it:** `see_video` on the hero clip(s) (mode:"scene" to see distinct moments, or "interval" for an overview). You get real frames — read the subject, the framing, the action, and pick the strongest visual moment for the hook.
+- **Read it:** `get_transcript` on the spoken clip → word-level timestamps of everything said. Now you know the actual hook line, the payoff, and where the filler is — so cuts and captions land on real content, not guesses.
+Use this understanding throughout: hook = the best moment you SAW or the best line you READ; captions = the real words; b-roll = illustrate what's actually said.
+
 ## 1. Set the frame (9:16)
 - `set_project_settings` with `aspectRatio: "9:16"` and `quality: "1080p"`. This is the single most important framing move for reels.
 - If a clip is landscape and now letterboxed, reframe it: `apply_layout` with `full` + `fill` so it covers the vertical frame (center-crop), or use `set_clip_properties` to scale/position the subject into frame. Keep faces/subjects in the upper-middle third.
@@ -23,7 +29,7 @@ The opening 3s decides retention. Do at least one of:
 Short-form lives on tight cuts — remove every pause, filler, and dead beat.
 - **Auto jump-cut-on-pause:** call `analyze_audio` on the talking clip — it returns `silenceRanges` (dead-air, in project frames). Feed those ranges to `ripple_delete_ranges` to delete the pauses and close the gaps in sync. This is the highest-ROI edit for talking-head footage.
 - Aim for a new visual event every ~1.5–3s: a cut, a zoom, a caption change, or a b-roll cutaway. If a clip runs longer than ~3s with no change, add one.
-- NOTE ON WORD-LEVEL CUTS: cutting specific filler WORDS (not just pauses) needs a transcript — Maestro doesn't transcribe speech on-device in this build. Pause-based cutting via `silenceRanges` works now; word-accurate cutting needs a transcript the user provides.
+- **Word-level cuts:** with a transcript from step 0, cut specific filler words ("um", "uh", false starts, tangents) with `remove_words` (by transcript index) — it ripple-deletes the exact word ranges and closes the gaps, the word-accurate version of pause cutting.
 
 ## 4. Add energy (zoom punches + retime + motion)
 - **Zoom punch** on emphasis: `set_keyframes` on `scale` from 1.0 to ~1.12 over 3–5 frames with `interpolationOut: "smooth"` (eases like a pro, not mechanical), then ease back. Punch in on reveals, punchlines, and the hook.

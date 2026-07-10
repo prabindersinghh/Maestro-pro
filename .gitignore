@@ -9,3 +9,7 @@ src-tauri/target
 generated/
 dist-server/
 src-tauri/resources/
+
+# Downloaded Whisper model weights (download-on-first-use)
+models/
+vendor/whisper/*.bin

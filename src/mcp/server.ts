@@ -30,10 +30,12 @@ const SERVER_INSTRUCTIONS =
   "ONLY way to produce a final video is export_project(mode:'video'), which renders the CURRENT TIMELINE " +
   "through Maestro — so the export is exactly what the user watched you build. Work step by step and " +
   "visibly: add clips, titles, music, effects one tool call at a time.\n" +
-  "Call get_timeline at the start of a session. generate_video/generate_image run on hosted providers " +
+  "Call get_timeline at the start of a session. Before editing footage you don't understand, PERCEIVE it: " +
+  "see_video returns real frames you can SEE (best moments, subject, framing); get_transcript returns " +
+  "word-level speech timestamps (on-device whisper). Then add_captions makes word-accurate captions and " +
+  "remove_words cuts specific spoken words. generate_video/generate_image run on hosted providers " +
   "(Fal/Replicate) when the user has added their key in Settings → Generation; generate_title/generate_motion " +
-  "render locally and always work. For a task that matches a skill, read_skill first and follow it. " +
-  "Transcription tools are stubbed in this build.";
+  "render locally and always work. For a task that matches a skill, read_skill first and follow it.";
 
 interface JsonRpcRequest {
   jsonrpc?: string;

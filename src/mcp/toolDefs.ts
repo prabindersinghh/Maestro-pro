@@ -773,6 +773,17 @@ export const ANALYSIS_TOOL_DEFS: ToolDef[] = [
       colors: int("How many swatches to return (2–12, default 6)."),
     }),
   },
+  {
+    name: "see_video",
+    description: "WATCH a clip: returns actual frames as images you can SEE, so you can identify the best moments, the subject and its position/framing, action, and what's on screen — then edit on content (not just rhythm/color). mode 'interval' samples evenly across the clip (overview); 'scene' returns distinct shots/scene-changes (finding moments). Each frame is labelled with its timestamp. Give a mediaRef or a clipId.",
+    inputSchema: obj({
+      mediaRef: str("Media asset id (from get_media)."),
+      clipId: str("Timeline clip id (from get_timeline) — samples within that clip's trimmed range."),
+      count: int("How many frames to return (1–12, default 6)."),
+      mode: enumStr(["interval", "scene"], "'interval' = evenly spaced (default); 'scene' = on scene changes."),
+      maxDim: int("Max frame dimension in px (default 512). Keep small to stay fast."),
+    }),
+  },
 ];
 
 /** Tools advertised over MCP: the frozen 41 plus the Skills + Motion + Analysis extensions. */

@@ -4,7 +4,7 @@
 
 import type { AnimatableProperty, ClipType } from "../model/enums";
 import { isVisual } from "../model/enums";
-import type { AnimPair, Crop, Keyframe, KeyframeValue, Timeline } from "../model/types";
+import type { AnimPair, Clip, Crop, Keyframe, KeyframeValue, Timeline } from "../model/types";
 import { defaultTrack, defaultClip, defaultTextStyle } from "../model/defaults";
 import { LAYOUTS, LAYOUT_NAMES, layoutPlacement, type LayoutFit, type LayoutSlot } from "../model/layout";
 import { EditEngine, type InsertSpec, type MoveSpec, type PlaceSpec } from "../engine/editEngine";
@@ -21,6 +21,8 @@ import { SkillStore } from "./skills";
 import { extractWaveform, type WaveformEnvelope } from "../audio/waveform";
 import { analyzeBeats } from "../audio/beats";
 import { extractPalette } from "../color/palette";
+import { extractFrames, type SampleMode } from "../vision/frames";
+import { transcribe, whisperAvailable, type TranscriptWord } from "../audio/transcribe";
 import { generate, type GenConfig, type GenKind } from "../gen/hosted";
 import { join } from "node:path";
 import { mkdir, writeFile } from "node:fs/promises";
@@ -28,13 +30,24 @@ import { publicDir, remotionDir, dataDir } from "./env";
 import type { VideoCodec, VideoResolution } from "../render/renderVideo";
 
 export interface ToolContentText { type: "text"; text: string }
+// Image content block — the MCP-canonical FLAT shape {type:"image", data, mimeType} (per the MCP
+// spec). Claude Code (MCP client) consumes this directly; the in-app agent translates it to the
+// Anthropic nested {source:{...}} shape before forwarding to the Messages API. base64, no data: prefix.
+export interface ToolContentImage { type: "image"; data: string; mimeType: string }
+export type ToolContent = ToolContentText | ToolContentImage;
 export interface ToolResult {
-  content: ToolContentText[];
+  // Invariant: the FIRST block is always text (a caption/JSON), optionally followed by image blocks.
+  // Typing the head as text keeps every `content[0].text` reader valid while allowing viewable frames.
+  content: [ToolContentText, ...ToolContent[]];
   isError?: boolean;
 }
 const ok = (text: string): ToolResult => ({ content: [{ type: "text", text }] });
 const err = (text: string): ToolResult => ({ content: [{ type: "text", text }], isError: true });
 const okJson = (obj: unknown): ToolResult => ok(JSON.stringify(obj));
+/** Result carrying a caption + one or more viewable frames (base64 JPEG/PNG), MCP image shape. */
+const okImages = (text: string, images: { media_type: string; data: string }[]): ToolResult => ({
+  content: [{ type: "text", text }, ...images.map((im): ToolContentImage => ({ type: "image", data: im.data, mimeType: im.media_type }))],
+});
 
 // --- arg helpers (mirror the Swift dict extension) ---
 type Args = Record<string, unknown>;
@@ -60,6 +73,9 @@ export class McpExecutor {
   /** BYOK hosted-generation config (Fal/Replicate), set by the app via /gen-config. */
   genConfig: GenConfig | null = null;
   projectDir: string | null = null;
+  /** Cached word-level transcripts by mediaRef, + the last one (for remove_words by index). */
+  private transcriptCache = new Map<string, TranscriptWord[]>();
+  private lastTranscript: { mediaRef: string; clipId?: string; words: TranscriptWord[] } | null = null;
   private fs: PackageFS | null;
   private agentUndo: string[] = [];
 
@@ -121,6 +137,159 @@ export class McpExecutor {
       silenceRanges: res.silences,
       note: "Frames are PROJECT frames. Cut on beats with split_clips / ripple_delete_ranges; remove silenceRanges with ripple_delete_ranges for jump-cut-on-pause; keyframe punches with set_keyframes.",
     });
+  }
+
+  // see_video — extract frames from a clip/asset and RETURN THEM AS VIEWABLE IMAGES so the model can
+  // actually watch the footage: identify the best moments, the subject and its position, and what's on
+  // screen — then edit on content, not just rhythm/color.
+  private async seeVideo(a: Args): Promise<ToolResult> {
+    const path = this.mediaPathFor(a);
+    if (!path) throw new ToolFail("see_video: provide a resolvable mediaRef or clipId (call get_media/get_timeline first).");
+    const count = Math.max(1, Math.min(12, aInt(a, "count") ?? 6));
+    const mode = (aStr(a, "mode") === "scene" ? "scene" : "interval") as SampleMode;
+    const clip = aStr(a, "clipId") ? this.engine.clipRef(aStr(a, "clipId")!) : null;
+    const startSec = clip ? (clip.trimStartFrame / this.fps) : undefined;
+    const endSec = clip ? (clip.trimStartFrame + Math.round(clip.durationFrames * clip.speed)) / this.fps : undefined;
+
+    const frames = await extractFrames(path, { count, mode, maxDim: aInt(a, "maxDim") ?? 512, startSec, endSec });
+    if (frames.length === 0) return err("see_video: could not extract any frames from this media.");
+    const label = frames.map((f, i) => `frame ${i + 1}: ${f.timeSec.toFixed(2)}s`).join(", ");
+    return okImages(
+      `${frames.length} frame(s) from this ${mode === "scene" ? "clip (scene changes)" : "clip (evenly sampled)"} — ${label}. ` +
+      `Use what you SEE (subject, framing, action, best moments) to drive the edit.`,
+      frames.map((f) => ({ media_type: f.media_type, data: f.data })),
+    );
+  }
+
+  // --- Transcription (on-device whisper.cpp) — get_transcript / add_captions / remove_words ---
+
+  private whisperMissing(): ToolResult {
+    return err(
+      "Transcription needs the on-device speech model. The whisper engine ships with the Maestro installer; " +
+      "in a dev run set MAESTRO_WHISPER to a whisper-cli binary. On first use the language model (~142 MB) " +
+      "downloads automatically. This is a setup step, not a failure.",
+    );
+  }
+
+  /** Transcribe a clip/asset to word-level timestamps (frames are relative to the MEDIA, 0 = its start). */
+  private async transcriptFor(mediaRef: string, path: string): Promise<TranscriptWord[]> {
+    const cached = this.transcriptCache.get(mediaRef);
+    if (cached) return cached;
+    const t = await transcribe(path, this.fps);
+    this.transcriptCache.set(mediaRef, t.words);
+    return t.words;
+  }
+
+  private async getTranscript(a: Args): Promise<ToolResult> {
+    if (!(await whisperAvailable())) return this.whisperMissing();
+    const path = this.mediaPathFor(a);
+    const mediaRef = aStr(a, "mediaRef") ?? (aStr(a, "clipId") ? this.engine.clipRef(aStr(a, "clipId")!)?.mediaRef : undefined);
+    if (!path || !mediaRef) throw new ToolFail("get_transcript: provide a resolvable mediaRef or clipId.");
+    const words = await this.transcriptFor(mediaRef, path);
+    this.lastTranscript = { mediaRef, clipId: aStr(a, "clipId"), words };
+    return okJson({
+      fps: this.fps,
+      wordCount: words.length,
+      text: words.map((w) => w.text).join(" "),
+      words: words.map((w, i) => ({ index: i, text: w.text, startMs: w.startMs, endMs: w.endMs, startFrame: w.startFrame, endFrame: w.endFrame })),
+      source: `whisper.cpp (on-device)`,
+      note: "startFrame/endFrame are relative to the MEDIA (0 = its start). add_captions/remove_words map these onto the clip's timeline placement automatically.",
+    });
+  }
+
+  /** Map a media-relative frame to a timeline frame for a placed clip (respects trim + speed). */
+  private mediaFrameToTimeline(clip: Clip, mediaFrame: number): number | null {
+    const rel = (mediaFrame - clip.trimStartFrame) / (clip.speed || 1);
+    if (rel < -0.5 || rel > clip.durationFrames + 0.5) return null; // outside the clip's visible range
+    return clip.startFrame + Math.round(rel);
+  }
+
+  private async addCaptions(a: Args): Promise<ToolResult> {
+    if (!(await whisperAvailable())) return this.whisperMissing();
+    const clipId = aStr(a, "clipId") ?? this.lastTranscript?.clipId;
+    if (!clipId) throw new ToolFail("add_captions: provide a clipId (the spoken clip to caption).");
+    const clip = this.engine.clipRef(clipId);
+    if (!clip) throw new ToolFail(`add_captions: clip ${clipId} not found.`);
+    const path = this.mediaPathFor({ clipId });
+    if (!path) throw new ToolFail("add_captions: clip media not resolvable.");
+    const words = await this.transcriptFor(clip.mediaRef, path);
+
+    const perCaption = Math.max(1, Math.min(8, aInt(a, "wordsPerCaption") ?? 3));
+    const style = (a.textStyle as Args | undefined);
+    const anim = (a.textAnimation as Args | undefined) ?? { preset: "wordReveal" };
+    const specs: PlaceSpec[] = [];
+    const payload: { content: string; style?: Args; anim: Args }[] = [];
+    for (let i = 0; i < words.length; i += perCaption) {
+      const chunk = words.slice(i, i + perCaption).map((w) => ({ w, tl0: this.mediaFrameToTimeline(clip, w.startFrame), tl1: this.mediaFrameToTimeline(clip, w.endFrame) }))
+        .filter((x) => x.tl0 !== null && x.tl1 !== null);
+      if (chunk.length === 0) continue;
+      const start = chunk[0].tl0!;
+      const end = Math.max(start + 1, chunk[chunk.length - 1].tl1!);
+      const id = cryptoId();
+      specs.push({ mediaRef: `text-${id}`, trackIndex: this.ensureTextTrack(), startFrame: start, durationFrames: end - start, mediaType: "text", sourceClipType: "text", id });
+      payload.push({ content: chunk.map((x) => x.w.text).join(" "), style, anim });
+    }
+    if (specs.length === 0) return err("add_captions: no spoken words fell within the clip's range.");
+    // Whisper word boundaries can overlap by a frame — clamp each caption's end to the next's start
+    // so consecutive captions all survive (overlapping clips on one track would overwrite each other).
+    for (let i = 0; i < specs.length - 1; i++) {
+      const maxDur = specs[i + 1].startFrame - specs[i].startFrame;
+      if (maxDur >= 1 && specs[i].durationFrames > maxDur) specs[i].durationFrames = maxDur;
+    }
+    const changed = this.engine.addClips(specs);
+    specs.forEach((s, i) => {
+      const c = this.engine.clipRef(s.id!);
+      if (!c) return;
+      c.textContent = payload[i].content;
+      c.textStyle ??= defaultTextStyle();
+      if (payload[i].style) Object.assign(c.textStyle, payload[i].style);
+      c.textAnimation = { preset: (payload[i].anim.preset as string) ?? "wordReveal", perWordFrames: aInt(payload[i].anim, "perWordFrames") ?? 6, highlight: payload[i].anim.highlight } as Clip["textAnimation"];
+      c.transform = { centerX: 0.5, centerY: 0.8, width: 0.9, height: 0.2, rotation: 0, flipHorizontal: false, flipVertical: false };
+    });
+    this.track(changed, "Add Captions");
+    return okJson({ captions: specs.length, clipIds: specs.map((s) => s.id), fromWords: words.length });
+  }
+
+  private async removeWords(a: Args): Promise<ToolResult> {
+    if (!(await whisperAvailable())) return this.whisperMissing();
+    const last = this.lastTranscript;
+    if (!last) throw new ToolFail("remove_words: call get_transcript first to establish the word list.");
+    // Resolve the clip these words map onto (the get_transcript clipId, or the first timeline clip of that media).
+    let clipId = last.clipId;
+    if (!clipId) {
+      for (const t of this.timeline.tracks) for (const c of t.clips) if (c.mediaRef === last.mediaRef) { clipId = c.id; break; }
+    }
+    if (!clipId) throw new ToolFail("remove_words: no timeline clip references the transcribed media.");
+    const clip = this.engine.clipRef(clipId)!;
+
+    // words arg: integer indices or inclusive [start,end] spans into last.words.
+    const idxSpans: [number, number][] = [];
+    for (const raw of aArr(a, "words")) {
+      if (typeof raw === "number") idxSpans.push([raw, raw]);
+      else if (Array.isArray(raw) && raw.length === 2 && raw.every((n) => typeof n === "number")) idxSpans.push([raw[0] as number, raw[1] as number]);
+    }
+    if (idxSpans.length === 0) throw new ToolFail("remove_words: 'words' must be transcript indices or [start,end] spans.");
+
+    const pad = Math.round(this.fps * 0.04);
+    const ranges: [number, number][] = [];
+    for (const [s, e] of idxSpans) {
+      const first = last.words[Math.max(0, Math.min(last.words.length - 1, s))];
+      const lastW = last.words[Math.max(0, Math.min(last.words.length - 1, e))];
+      const tl0 = this.mediaFrameToTimeline(clip, first.startFrame);
+      const tl1 = this.mediaFrameToTimeline(clip, lastW.endFrame);
+      if (tl0 === null || tl1 === null) continue;
+      ranges.push([Math.max(clip.startFrame, tl0 - pad), tl1 + pad]);
+    }
+    if (ranges.length === 0) return err("remove_words: the requested words don't fall within the clip.");
+    // Merge overlapping/adjacent ranges, then ripple-delete (word-level jump cut).
+    ranges.sort((x, y) => x[0] - y[0]);
+    const merged: [number, number][] = [ranges[0]];
+    for (let i = 1; i < ranges.length; i++) {
+      const prev = merged[merged.length - 1];
+      if (ranges[i][0] <= prev[1]) prev[1] = Math.max(prev[1], ranges[i][1]);
+      else merged.push(ranges[i]);
+    }
+    return this.rippleDeleteRanges({ clipId, ranges: merged, units: "frames" });
   }
 
   // extract_palette — dominant colours (hex + prominence) of a clip/asset, for palette-driven
@@ -304,7 +473,7 @@ export class McpExecutor {
     const READ_ONLY = new Set([
       "get_timeline", "get_media", "inspect_media", "get_transcript", "inspect_timeline",
       "search_media", "inspect_color", "list_folders", "list_models", "send_feedback", "export_project",
-      "list_skills", "read_skill", "analyze_audio", "extract_palette",
+      "list_skills", "read_skill", "analyze_audio", "extract_palette", "see_video", "get_transcript",
     ]);
     try {
       const result = await this.run(name, args ?? {});
@@ -330,14 +499,15 @@ export class McpExecutor {
       // Motion graphics (Maestro extension)
       case "generate_title": return this.generateTitle(a);
       case "generate_motion": return this.generateMotion(a);
-      // Analysis (Maestro extension — enables beat-sync + palette/brand skills)
+      // Analysis + perception (Maestro extension)
       case "analyze_audio": return this.analyzeAudio(a);
       case "extract_palette": return this.extractPalette(a);
+      case "see_video": return this.seeVideo(a);
       // Read
       case "get_timeline": return this.getTimeline(a);
       case "get_media": return okJson({ media: this.media.mediaRows() });
       case "inspect_media": return this.unavailable("inspect_media", "transcription/frame sampling");
-      case "get_transcript": return this.unavailable("get_transcript", "on-device transcription");
+      case "get_transcript": return this.getTranscript(a);
       case "inspect_timeline": return this.unavailable("inspect_timeline", "compositing/render");
       case "search_media": return this.unavailable("search_media", "on-device semantic/transcript search");
       case "inspect_color": return this.unavailable("inspect_color", "compositing/render");
@@ -351,14 +521,14 @@ export class McpExecutor {
       case "set_clip_properties": return this.setClipProperties(a);
       case "set_keyframes": return this.setKeyframes(a);
       case "ripple_delete_ranges": return this.rippleDeleteRanges(a);
-      case "remove_words": return this.unavailable("remove_words", "on-device transcription");
+      case "remove_words": return this.removeWords(a);
       case "sync_audio": return this.unavailable("sync_audio", "audio cross-correlation");
       case "undo": return this.undo();
       case "apply_layout": return this.applyLayout(a);
       // Text
       case "add_texts": return this.addTexts(a);
       case "update_text": return this.updateText(a);
-      case "add_captions": return this.unavailable("add_captions", "on-device transcription");
+      case "add_captions": return this.addCaptions(a);
       // Color / effects
       case "apply_effect": return this.applyEffectOrColor(a, false);
       case "apply_color": return this.applyEffectOrColor(a, true);

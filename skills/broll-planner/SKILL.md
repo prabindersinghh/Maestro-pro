@@ -12,7 +12,8 @@ B-roll hides cuts, illustrates the point, and adds visual variety. Goal: overlay
 ## 1. Understand the A-roll
 - `get_timeline` for the main (A-roll) clips; `get_media` for what's already in the library.
 - Identify the moments that need visual support: a concept mentioned, a slow stretch, a place/object referenced, or a cut you want to hide.
-- SOURCE OF "what's being said": Maestro does not transcribe speech on-device in this build (`get_transcript`/`search_media` are unavailable). So either (a) the user provides the topic/script/transcript, or (b) work from what you can see in the footage and the media names. Say which you're using.
+- **Know what's said:** call `get_transcript` on the A-roll → word-level text + timestamps. Now you can place a cutaway exactly when a topic is mentioned (e.g. B-roll of coffee the moment "coffee" is said).
+- **Know what's shown:** `see_video` on the A-roll (and on library clips) to read the actual content — so your cutaways match the subject and don't clash with what's on screen.
 
 ## 2. Choose B-roll for each moment
 Two sources:

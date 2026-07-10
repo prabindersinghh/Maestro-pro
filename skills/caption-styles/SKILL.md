@@ -39,10 +39,10 @@ Captions drive retention (most short-form is watched muted). Maestro renders and
 - `textAnimation` `slideUp` (or `wordSlide`), left-aligned, smaller, with a subtle bar.
 - For names/titles/context rather than spoken captions.
 
-## Timing captions to speech
-- Maestro does not transcribe audio on-device in this build (`add_captions`/`get_transcript` are unavailable). To time captions to the words:
-  - If the user provides the transcript (or per-word timings), place each caption clip at the right frames.
-  - Otherwise, add call-out captions at the key moments (hook, punchline, CTA) rather than a full running caption track, and tell the user that word-accurate auto-captioning needs a transcript.
+## Timing captions to speech (automatic)
+- `add_captions` transcribes the clip on-device (whisper) and lays word-accurate caption clips automatically. Give it the spoken clip's `clipId`, a `wordsPerCaption` (2–4 for karaoke feel), and the `textStyle` + `textAnimation` you want (e.g. `highlightPop` for karaoke, `wordPop` for energy). Each caption lands at the exact frames the words are spoken.
+- Prefer this over hand-placing text for spoken captions — it's word-accurate. For NON-spoken call-outs (a hook line, a CTA), use `add_texts` directly.
+- To see the words first (to pick a hook line or edit wording), call `get_transcript`.
 
 ## Apply
-Use `add_texts` to create the caption clips (they land on a dedicated text track), set `textStyle` + `textAnimation`, then `update_text` to refine wording/timing. Keep ONE caption style consistent across the video.
+For spoken captions: `add_captions(clipId, wordsPerCaption, textStyle, textAnimation)`. For manual call-outs: `add_texts` (lands on a dedicated text track), then `update_text` to refine. Keep ONE caption style consistent across the video.

@@ -24,7 +24,7 @@ beforeAll(() => {
   ], { stdio: "ignore" });
 }, 60000);
 
-const ok = (r: { content: { text: string }[]; isError?: boolean }) => { expect(r.isError).toBeFalsy(); return JSON.parse(r.content[0].text); };
+const ok = (r: { content: { type: string; text?: string }[]; isError?: boolean }) => { expect(r.isError).toBeFalsy(); return JSON.parse(r.content[0].text ?? ""); };
 const allClips = (ex: McpExecutor): Clip[] => ex.timeline.tracks.flatMap((t) => t.clips);
 const videoClip = (ex: McpExecutor): Clip => allClips(ex).find((c) => c.mediaType === "video")!;
 const timelineLen = (ex: McpExecutor): number => Math.max(0, ...allClips(ex).map(endFrame));

@@ -48,3 +48,21 @@ See `../PROGRESS.md` → "Licensing / attribution (standing requirement)".
 Bundled/ported third-party components retain their own licenses (React, Tauri, FFmpeg, fonts, etc.).
 Fonts vendored by upstream (Inter, Geist, DM Sans, …) are under the SIL Open Font License — see the
 upstream `Resources/Fonts/*/OFL.txt`.
+
+### Perception (transcription + vision)
+
+- **whisper.cpp** — https://github.com/ggml-org/whisper.cpp — Copyright © The ggml authors.
+  Licensed under the **MIT License**. Maestro bundles the prebuilt Windows CPU CLI (`whisper-cli.exe`
+  + `ggml*.dll`) under `vendor/whisper/` for on-device speech transcription. The Whisper GGML model
+  weights (`ggml-*.bin`, hosted on Hugging Face) are likewise MIT and download on first use.
+- **claude-video** — https://github.com/bradautomates/claude-video — Copyright © 2026 Bradley Bonanno.
+  **MIT.** Studied for ideas only (budget-by-duration frame count, scene-change selection, perceptual
+  dedup, downscale/clamp, per-frame reason). No source copied — Maestro's `src/vision/frames.ts` is an
+  independent reimplementation.
+- **claude-video-vision** — https://github.com/jordanrendric/claude-video-vision — Copyright © 2026
+  Jordan Vasconcelos. **MIT.** Studied for ideas only (two-phase analyze-then-extract, adaptive
+  fps/resolution ladders, interleaved timestamped frame labels). No source copied.
+
+`src/vision/frames.ts` (frame extraction), `src/audio/transcribe.ts` (whisper invocation + JSON
+word-timestamp parsing), `src/audio/beats.ts`, and `src/color/palette.ts` are all original Maestro
+code over the bundled FFmpeg — clean-room, keeping the paid-tier path free of copyleft.

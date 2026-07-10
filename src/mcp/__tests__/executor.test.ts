@@ -99,12 +99,22 @@ describe("Stage-C: stub shapes (SPEC §10/§11)", () => {
     expect(JSON.parse(r.content[0].text)).toEqual({ models: [], loaded: false });
   });
 
-  it("transcription/render tools report unavailable (structured, not a crash)", async () => {
+  it("still-stubbed tools report unavailable (structured, not a crash)", async () => {
     const ex = new McpExecutor();
-    for (const t of ["get_transcript", "inspect_timeline", "search_media", "add_captions"]) {
+    for (const t of ["inspect_timeline", "search_media", "inspect_media"]) {
       const r = await ex.execute(t, {});
       expect(r.isError).toBe(true);
       expect(r.content[0].text).toMatch(/not available in this build/);
+    }
+  });
+
+  it("transcription tools ask for the whisper setup when the model/binary isn't present", async () => {
+    const ex = new McpExecutor();
+    for (const t of ["get_transcript", "add_captions"]) {
+      const r = await ex.execute(t, {});
+      expect(r.isError).toBe(true);
+      // Either the whisper setup message (no binary) or a clear arg error — never a crash.
+      expect(r.content[0].text).toMatch(/whisper|transcription|clipId|mediaRef/i);
     }
   });
 });

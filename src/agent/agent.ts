@@ -56,10 +56,21 @@ export class MaestroAgent {
     return j.result;
   }
 
-  private async callTool(name: string, input: unknown): Promise<string> {
+  // Returns the tool's content blocks (text and/or image) so vision tools' frames reach the model.
+  // The MCP server emits image blocks in the flat MCP shape {type:"image", data, mimeType}; the
+  // Anthropic Messages API needs the nested {type:"image", source:{type:"base64", media_type, data}}
+  // — translate here so the frames the model actually SEES are valid in a tool_result.
+  private async callTool(name: string, input: unknown): Promise<ContentBlock[]> {
     const r = await this.rpc("tools/call", { name, arguments: input });
-    const content = (r.content as { text?: string }[]) ?? [];
-    return content.map((c) => c.text ?? "").join("\n") || "(no output)";
+    const content = ((r.content as ContentBlock[]) ?? []).map((c) => {
+      if (c.type === "image" && typeof (c as { data?: unknown }).data === "string") {
+        const { data, mimeType } = c as unknown as { data: string; mimeType: string };
+        return { type: "image", source: { type: "base64", media_type: mimeType || "image/jpeg", data } } as ContentBlock;
+      }
+      return c;
+    });
+    if (content.length === 0) return [{ type: "text", text: "(no output)" }];
+    return content;
   }
 
   private async callAnthropic(tools: ToolDef[]): Promise<{ content: ContentBlock[]; stop_reason: string }> {
@@ -102,10 +113,10 @@ export class MaestroAgent {
         const results: ContentBlock[] = [];
         for (const tu of toolUses) {
           this.cb.onToolCall(tu.name as string);
-          let text: string;
-          try { text = await this.callTool(tu.name as string, tu.input); }
-          catch (e) { text = `Error: ${e instanceof Error ? e.message : String(e)}`; }
-          results.push({ type: "tool_result", tool_use_id: tu.id as string, content: text });
+          let content: ContentBlock[];
+          try { content = await this.callTool(tu.name as string, tu.input); }
+          catch (e) { content = [{ type: "text", text: `Error: ${e instanceof Error ? e.message : String(e)}` }]; }
+          results.push({ type: "tool_result", tool_use_id: tu.id as string, content });
           this.cb.afterTool(); // pull the new server state into the UI live
         }
         this.messages.push({ role: "user", content: results });
