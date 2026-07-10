@@ -104,4 +104,20 @@ describe("Stage-C: MCP HTTP transport (maestro on 127.0.0.1)", () => {
     const res = await fetch(`http://127.0.0.1:${PORT}/nope`);
     expect(res.status).toBe(404);
   });
+
+  it("GPU endpoints are routed and return sensible shapes (gcp-ltx)", async () => {
+    const B = `http://127.0.0.1:${PORT}`;
+    // /gpu/status with nothing configured → stopped
+    const s0 = await (await fetch(`${B}/gpu/status`)).json();
+    expect(s0.status).toBe("stopped");
+    // configure a VM
+    const cfg = await fetch(`${B}/gpu/config`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ project: "p", zone: "us-central1-a", instance: "ltx-gpu", port: 8000 }) });
+    expect((await cfg.json()).ok).toBe(true);
+    // missing required fields → 400
+    const bad = await fetch(`${B}/gpu/config`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ project: "p" }) });
+    expect(bad.status).toBe(400);
+    // status now probes gcloud; with no gcloud installed it resolves to error/stopped, never a crash
+    const s1 = await (await fetch(`${B}/gpu/status`)).json();
+    expect(["error", "stopped", "starting"]).toContain(s1.status);
+  });
 });
