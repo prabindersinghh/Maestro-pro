@@ -1,5 +1,12 @@
 [
   {
+    "id": "build-in-maestro",
+    "name": "Build inside Maestro (house rule)",
+    "description": "The non-negotiable way to work — build every edit ON the Maestro timeline via MCP tools so the user watches it happen, and render only with Maestro's own Export. Read before any editing task.",
+    "sha": "local",
+    "path": "build-in-maestro/SKILL.md"
+  },
+  {
     "id": "viral-reel",
     "name": "Viral-style reel",
     "description": "Turn raw footage into a punchy vertical (9:16) short: hook in the first 3s, tight jump cuts, zoom punches, trending captions, and a beat-aware rhythm. Use when asked to 'make this a viral reel / short / TikTok / Reel'.",

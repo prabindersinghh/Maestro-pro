@@ -5,6 +5,8 @@ description: Give a clip or project a cohesive designed look — extract the pal
 
 # Creative director
 
+Follow the `build-in-maestro` house rule: apply every grade, title, and graphic ON the Maestro timeline via tools so the user sees the look develop; never render a standalone file; finish with `export_project(mode:"video")`.
+
 Make it look intentional, not raw. Three layers: color, palette-driven graphics, and typography. Ground every choice in the footage's actual colors.
 
 ## 1. Read the palette

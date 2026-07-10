@@ -5,6 +5,8 @@ description: Plan and place B-roll cutaways over an A-roll talking track — fro
 
 # B-roll planner
 
+Follow the `build-in-maestro` house rule: every cutaway is placed ON the Maestro timeline via tools, and any b-roll you generate is imported + placed (`generate_video`/`generate_image` auto-place; external files via `import_media` + `add_clips`) — never assembled into a standalone file. Finish with `export_project(mode:"video")`.
+
 B-roll hides cuts, illustrates the point, and adds visual variety. Goal: overlay relevant cutaways on top of the A-roll at the right moments.
 
 ## 1. Understand the A-roll

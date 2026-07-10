@@ -5,7 +5,9 @@ description: Turn raw footage into a punchy vertical (9:16) short — hook, jump
 
 # Viral-style reel
 
-Your job: take what's on the timeline and turn it into a short-form vertical video that earns attention in the first 3 seconds and keeps it. Work in passes. Call `get_timeline` and `get_media` first so you know what you're working with. Every step below maps to real Maestro tools — apply them, don't just describe them.
+FIRST, follow the house rule in the `build-in-maestro` skill: build everything ON the Maestro timeline via tools (the user watches it happen), never render a standalone file, and finish with Maestro's own Export. Every step below is a tool call — apply it, don't just describe it.
+
+Your job: take what's on the timeline and turn it into a short-form vertical video that earns attention in the first 3 seconds and keeps it. Work in passes, visibly. Call `get_timeline` and `get_media` first so you know what you're working with.
 
 ## 1. Set the frame (9:16)
 - `set_project_settings` with `aspectRatio: "9:16"` and `quality: "1080p"`. This is the single most important framing move for reels.
@@ -42,6 +44,9 @@ Most short-form is watched muted — captions are non-negotiable.
 ## 7. Outro / loop
 - End on a clear payoff or a loop-back to the hook. A short outro card (`generate_title`) with a CTA ("follow for part 2") works. Keep it under ~1.5s.
 
+## 8. Export from Maestro
+- Render the finished reel with `export_project(mode:"video")` — this renders the CURRENT TIMELINE you just built, through Maestro. Do NOT render a separate file with ffmpeg. If the user would rather export themselves, tell them to press Export in the app.
+
 ## Checklist before you finish
 - [ ] 9:16, subject in frame, no letterboxing
 - [ ] A real hook in the first 3s (visual + text)
@@ -50,5 +55,6 @@ Most short-form is watched muted — captions are non-negotiable.
 - [ ] Captions present, styled, readable muted
 - [ ] Cohesive grade; graphics match the palette
 - [ ] Clean payoff/outro
+- [ ] Everything is ON the timeline; final render via export_project(mode:"video")
 
 Tell the user which of these you applied and which need input from them (e.g. the spoken transcript for word-accurate caption timing).

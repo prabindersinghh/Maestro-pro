@@ -20,10 +20,20 @@ const DEFAULT_PROTOCOL = "2025-06-18";
 const SUPPORTED_PROTOCOLS = new Set(["2025-06-18", "2025-03-26", "2024-11-05", DEFAULT_PROTOCOL]);
 
 const SERVER_INSTRUCTIONS =
-  "Maestro MCP server (AI-native video editor). Call get_timeline at the start of a session. " +
-  "generate_video/generate_image run on hosted providers (Fal/Replicate) when the user has added their key " +
-  "in Settings → Generation; if not set they return a clear setup message. generate_title/generate_motion " +
-  "render locally and always work. Transcription tools are stubbed in this build.";
+  "Maestro MCP server (AI-native video editor).\n" +
+  " core rule — BUILD INSIDE MAESTRO, never bypass it: every editing action MUST go through these MCP " +
+  "tools so the result appears on the user's Maestro timeline as you work. NEVER run ffmpeg (or any " +
+  "external tool) yourself to produce a finished standalone video file, and never hand the user a raw " +
+  "file path as the deliverable. If you create an asset (a motion clip, a title, a score, an image), it " +
+  "MUST be imported and placed on the timeline: use generate_motion / generate_title / generate_video / " +
+  "generate_image (they auto-import + place), or import_media then add_clips for an external file. The " +
+  "ONLY way to produce a final video is export_project(mode:'video'), which renders the CURRENT TIMELINE " +
+  "through Maestro — so the export is exactly what the user watched you build. Work step by step and " +
+  "visibly: add clips, titles, music, effects one tool call at a time.\n" +
+  "Call get_timeline at the start of a session. generate_video/generate_image run on hosted providers " +
+  "(Fal/Replicate) when the user has added their key in Settings → Generation; generate_title/generate_motion " +
+  "render locally and always work. For a task that matches a skill, read_skill first and follow it. " +
+  "Transcription tools are stubbed in this build.";
 
 interface JsonRpcRequest {
   jsonrpc?: string;
