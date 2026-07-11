@@ -9,7 +9,7 @@ describe("bundled skill library (local-first)", () => {
     const r = await ex.execute("list_skills", {});
     const { skills } = JSON.parse(r.content[0].text) as { skills: { id: string }[] };
     const ids = skills.map((s) => s.id);
-    for (const id of ["build-in-maestro", "viral-reel", "beat-sync-cutting", "creative-director", "caption-styles", "broll-planner"]) {
+    for (const id of ["build-in-maestro", "viral-reel", "beat-sync-cutting", "creative-director", "caption-styles", "broll-planner", "platform-delivery", "promo-ad"]) {
       expect(ids).toContain(id);
     }
   });

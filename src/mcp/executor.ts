@@ -24,6 +24,7 @@ import { extractPalette } from "../color/palette";
 import { extractFrames, type SampleMode } from "../vision/frames";
 import { transcribe, whisperAvailable, type TranscriptWord } from "../audio/transcribe";
 import { generate, type GenConfig, type GenKind } from "../gen/hosted";
+import { ytdlpAvailable, downloadUrl } from "../gen/download";
 import { join } from "node:path";
 import { mkdir, writeFile } from "node:fs/promises";
 import { publicDir, remotionDir, dataDir } from "./env";
@@ -348,6 +349,32 @@ export class McpExecutor {
     return okJson({ assetId: asset.id, name: asset.name, type: asset.type, duration: asset.duration });
   }
 
+  // import_from_url: download a video from a URL (YouTube, etc.) with the user's yt-dlp, import it,
+  // and place it on the timeline. yt-dlp is NOT bundled — the user provides it (site-policy + size).
+  private async importFromUrl(a: Args): Promise<ToolResult> {
+    const url = requireStr(a, "url");
+    if (!/^https?:\/\//i.test(url)) throw new ToolFail("import_from_url: url must be an http(s) link.");
+    if (!(await ytdlpAvailable())) {
+      return err(
+        "import_from_url needs yt-dlp, which isn't installed. Install it (pip install yt-dlp, or from " +
+        "github.com/yt-dlp/yt-dlp) and make sure it's on PATH, then retry. This is a setup step, not a failure.",
+      );
+    }
+    const dir = join(dataDir(), "generated");
+    await mkdir(dir, { recursive: true });
+    const path = await downloadUrl(url, join(dir, `dl-${cryptoId()}.%(ext)s`));
+    const imp = await this.importFromPath(path, aStr(a, "name"));
+    const impData = JSON.parse(imp.content[0].text) as { assetId: string; name: string; duration: number };
+    const place = aBool(a, "place") !== false;
+    if (place) {
+      const dur = Math.max(1, Math.round((impData.duration || 5) * this.fps));
+      const trackIndex = this.ensureTrack("video");
+      this.engine.addClips([{ mediaRef: impData.assetId, trackIndex, startFrame: this.currentFrame, durationFrames: dur, mediaType: "video", sourceClipType: "video" }]);
+      this.track(true, "Import from URL");
+    }
+    return okJson({ assetId: impData.assetId, name: impData.name, url, placed: place });
+  }
+
   // generate_title (motion graphics): render an animated title MP4 locally, import it, place it.
   private async generateTitle(a: Args): Promise<ToolResult> {
     const text = requireStr(a, "text");
@@ -541,6 +568,7 @@ export class McpExecutor {
       case "apply_color": return this.applyEffectOrColor(a, true);
       // Media library
       case "import_media": return this.importMedia(a);
+      case "import_from_url": return this.importFromUrl(a);
       case "list_folders": return okJson({ folders: this.media.folders });
       case "create_folder": return this.createFolder(a);
       case "move_to_folder": return this.moveToFolder(a);

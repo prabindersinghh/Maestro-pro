@@ -774,6 +774,15 @@ export const ANALYSIS_TOOL_DEFS: ToolDef[] = [
     }),
   },
   {
+    name: "import_from_url",
+    description: "Download a video from a URL (YouTube, Vimeo, a direct link, …) and place it on the timeline. Uses the user's installed yt-dlp (not bundled); if it's missing, returns a clear install message. Give a `url`; place=false to only add it to the library.",
+    inputSchema: obj({
+      url: str("http(s) link to a video or a supported site page."),
+      name: str("Optional display name in the media library."),
+      place: bool("Place on the timeline at the playhead (default true)."),
+    }, ["url"]),
+  },
+  {
     name: "see_video",
     description: "WATCH a clip: returns actual frames as images you can SEE, so you can identify the best moments, the subject and its position/framing, action, and what's on screen — then edit on content (not just rhythm/color). mode 'interval' samples evenly across the clip (overview); 'scene' returns distinct shots/scene-changes (finding moments). Each frame is labelled with its timestamp. Give a mediaRef or a clipId.",
     inputSchema: obj({

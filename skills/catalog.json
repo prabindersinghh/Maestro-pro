@@ -40,5 +40,19 @@
     "description": "Plan and place B-roll cutaways over an A-roll talking track — from the media library or generated (BYOK). Use when the edit needs visual variety or to illustrate what's being said.",
     "sha": "local",
     "path": "broll-planner/SKILL.md"
+  },
+  {
+    "id": "platform-delivery",
+    "name": "Platform delivery",
+    "description": "Package the finished edit for each platform — Reels/TikTok/Shorts (9:16), feed (1:1), YouTube (16:9) — with the right aspect, safe areas, duration, and captions, then export. Use when delivering for social/YouTube.",
+    "sha": "local",
+    "path": "platform-delivery/SKILL.md"
+  },
+  {
+    "id": "promo-ad",
+    "name": "Promo / ad video",
+    "description": "Build a short promo or ad — hook, benefit beats, and a clear call-to-action — with titles, captions, music, and pacing. Use for 'make a promo / ad / product video'.",
+    "sha": "local",
+    "path": "promo-ad/SKILL.md"
   }
 ]
