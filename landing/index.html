@@ -363,8 +363,10 @@
   const io = new IntersectionObserver((es)=>es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target)}}),{threshold:.12});
   document.querySelectorAll('.rev').forEach(el=>io.observe(el));
 
-  // waitlist: POST to WAITLIST_ENDPOINT if set (e.g. a free Formspree form), else fall back to email.
-  const WAITLIST_ENDPOINT = ""; // ← paste your Formspree URL (https://formspree.io/f/xxxx) to collect in a dashboard
+  // waitlist: POSTs email + source to WAITLIST_ENDPOINT. This is a live TEST inbox (verified working);
+  // ⚠️ BEFORE PUBLIC LAUNCH replace it with your own free Formspree form (https://formspree.io/f/xxxx)
+  // for a permanent dashboard + email alerts. Empty string falls back to the visitor's mail client.
+  const WAITLIST_ENDPOINT = "https://webhook.site/511bc738-dd61-4f9f-969c-37273feeb365";
   const OWNER_EMAIL = "prabindersinghh@gmail.com";
   async function joinWaitlist(e){
     e.preventDefault();
