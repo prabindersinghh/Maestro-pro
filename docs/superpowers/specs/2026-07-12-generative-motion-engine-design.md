@@ -16,8 +16,12 @@ mechanism, not generic templates.
 
 - **Safe:** the agent NEVER writes executable code. It emits a validated declarative **SceneSpec**
   (JSON). A single trusted renderer interprets it. No `eval`, no arbitrary `.tsx`, no code-exec hole.
-- **Robust:** invalid spec → precise validation error → agent retries. Render failure → fallback to
-  the nearest built-in template + an honest note. A bad spec can never crash or hang the app.
+- **Robust, and FAIL LOUD:** invalid spec → precise validation error → agent retries with a corrected
+  spec. Render failure → a clear error the agent can act on → retry. A template fallback is used ONLY
+  after retries are exhausted, and is **explicitly labelled as a fallback** in the tool result — never
+  a silent substitution. A bad spec can never crash or hang the app, but it also never quietly passes
+  off a generic template as the bespoke film. (Silent fallback would hide quality failures during the
+  quality gate — exactly when they must be visible.)
 - **Premium by construction:** brand tokens + deep primitives so output reads as *designed*, not
   *assembled*. The quality gate (below) enforces this with real rendered output the user judges.
 
@@ -28,13 +32,14 @@ Agent (Kaestral's brain)
    │  designs a video as a SceneSpec (JSON)
    ▼
 compose_motion  (new MCP tool)  ──►  validate SceneSpec (closed-enum schema + clamps + token allowlist)
-   │                                      │ invalid → clear error → agent retries
+   │                                      │ invalid → clear error → agent RETRIES with corrected spec
    ▼                                      │ valid
 Generative.tsx  (ONE trusted component)   │
    │   interprets spec → primitives  ◄────┘   never eval'd; a fixed interpreter over bounded data
    ▼
 render.mjs (existing pipeline) ──► MP4 ──► import + place on timeline
-   │  on render failure → fallback to nearest built-in template + honest note
+   │  on render failure → clear error → agent RETRIES; template fallback ONLY after retries exhausted,
+   │  and always LABELLED as a fallback (never silent)
 ```
 
 ### Four isolated, independently-testable units
@@ -65,22 +70,30 @@ allowlist** + hex check. Unknown field → validation error. No free-form CSS, n
       "background": { "kind": "grid"|"glow"|"parallax"|"solid", "accent": "<brand token or allowed hex>" },
       "layers": [
         {
-          "element": "text"|"video"|"image"|"screenMock"|"waveform"|"timeline"|"logo"
+          "element": "text"|"textOnPath"|"video"|"image"|"screenMock"|"waveform"|"timeline"|"logo"
                    |"shape"|"hairline"|"barChart"|"lineChart"|"areaChart"|"counter"
-                   |"captionKaraoke"|"particles"|"arrow"|"highlightBox"|"pointerLine"|"spotlightDim",
+                   |"captionKaraoke"|"particles"|"arrow"|"highlightBox"|"pointerLine"|"spotlightDim"
+                   |"splitLayout"|"gridLayout"|"countdown",   // layouts nest child layers
           "props": { /* element-specific, all bounded (see primitives) */ },
           "position": { "x": 0.5, "y": 0.5 },        // normalized 0..1, clamped
           "opacity": 1.0,                            // 0..1
           "blur": 0,                                 // px, clamped 0..24 (depth)
-          "enter": { "anim": "spring"|"typewriter"|"wordReveal"|"kinetic"|"draw"|"fade"|"collapse",
+          "depth": "foreground"|"mid"|"background",  // drives DepthOfField focus-pull ordering
+          "mask": { "shape": "circle"|"pill"|"rect"|"logo"|"wipe", "reveal": "left"|"up"|"iris"|"none" },
+          "motionBlur": true,                        // directional blur + trails on fast motion
+          "kenBurns": { "move": "push"|"drift"|"zoom"|"none", "amount": 0.08 },  // for image/video
+          "lightingSweep": { "on": false, "angle": 20, "speed": 1 },
+          "enter": { "anim": "spring"|"typewriter"|"wordReveal"|"kinetic"|"draw"|"fade"|"collapse"|"maskReveal",
                      "easing": "ease-out"|"spring"|"linear", "delay": 0, "from": "below"|"left"|"scale",
                      "snapToBeat": false },
-          "exit":  { "anim": "fade"|"collapse"|"none", "at": 60 },
+          "exit":  { "anim": "fade"|"collapse"|"glitch"|"none", "at": 60 },
           "style": { "role": "display"|"accent"|"muted", "size": 0.09 }   // tokens, not raw CSS
         }
       ],
-      "transitionOut": { "kind": "wipe"|"dissolve"|"push"|"glitch"|"cut", "accent": "<token>",
+      "transitionOut": { "kind": "wipe"|"dissolve"|"push"|"glitch"|"rgbSplit"|"cut", "accent": "<token>",
                          "snapToBeat": false }
+      // Note: mask/depth/motionBlur/kenBurns/lightingSweep are per-LAYER modifiers (above), applied by
+      // the interpreter to whatever element the layer holds — not standalone elements themselves.
     }
   ]
 }
@@ -118,6 +131,22 @@ draw in), `Grid` (drifting), `GlowField` (kestrel-eye bloom).
 **Atmosphere & motion:** `Particles` (drifting nodes + connecting lines — constellation motif),
 transition primitives (wipe/dissolve/push/glitch/cut), `Camera` wrapper (push-in/pan/rack/parallax).
 
+**Premium-motion set (built NOW — this is what reads as "designed", not "assembled"):**
+- `Mask` / `Reveal` — shape-masked reveals: text revealed through a moving wipe shape; video/image
+  revealed through a circle, pill, or the logo mark as a mask. (`maskShape`, `revealDirection`.)
+- `SplitLayout` / `GridLayout` — multi-panel composition: side-by-side, 2×2, filmstrip, so the agent
+  builds complex frames, not just stacked layers. (Panels are themselves layers.)
+- `DepthOfField` — blur-behind / focus-pull between layers so a camera rack-focus actually reads
+  (foreground sharp, background blurred, focus shifts over the beat).
+- `MotionBlur` / `Trails` — directional blur + trailing ghosts on fast-moving elements. The single
+  biggest amateur-vs-premium tell; applied to any layer with fast `position`/scale motion.
+- `TextOnPath` / kinetic typography — text that arcs along a path, scales, and lands as a composition
+  (not a centered line). (`path`: arc/wave/diagonal; per-word transforms.)
+- `LightingSweep` — a specular light pass across a surface/text (the Apple-product-shot "expensive"
+  feel). (`angle`, `speed`, `softness`.)
+- `KenBurns` — slow push/drift/zoom on images and video, so static assets never feel static.
+- `Stinger` accents — `Countdown` (3·2·1), `Glitch` / `RGBSplit` bursts for launch-film energy.
+
 **Brand tokens (single source, `remotion/src/primitives/tokens.ts`):** black `#0b0a0d` · green
 `#16b16a`/`#1fce7e` · gold hairline `rgba(201,162,39,.55)` · white hairline `rgba(255,255,255,.10)` ·
 slate `#484852`/`#2b2931` · Geist / Geist-Mono type roles.
@@ -138,18 +167,22 @@ on the v1 critical path). Recorded here and in the Pro-tier spec.
 
 - Input: a `SceneSpec` (validated). Optional `place` (default true), `durationSeconds` derived from beats.
 - Flow: validate → `renderRemotion("Generative", { spec }, out, remotionDir)` → import asset → place on
-  timeline. On validation error: return the precise message so the agent self-corrects. On render
-  failure: fall back to a built-in template chosen by a simple deterministic rule — if the spec is
-  chart-dominant → `DataViz`, logo-dominant → `LogoReveal`, else → `AnimatedIntro` (with the spec's
-  first title/subtitle/accent) — and return an honest note that a fallback was used.
-- Coexists with `generate_motion` (the 4 templates stay as the fallback + simple path).
+  timeline.
+- **Fail loud, retry, never silent-substitute:**
+  - Validation error → return the precise offending path so the agent self-corrects and retries.
+  - Render error → return a clear, actionable error so the agent retries with a fixed spec.
+  - A template fallback is attempted ONLY after retries are exhausted, and the tool result carries an
+    explicit `fallback: true` + reason so the user/agent KNOWS a bespoke render failed. The result
+    never presents a template as if it were the generated film.
+- Coexists with `generate_motion` (the 4 templates stay as an explicit simple path, not a silent net).
 
 ## Error handling
 
 - **Validation:** closed-enum + clamp + token allowlist in `sceneSpec.ts`; returns `{ ok:false, error }`
   with the exact offending path. Never throws into the render.
-- **Render:** wrapped; timeout; failure → template fallback; the tool result always tells the truth
-  about what was produced (generative vs fallback).
+- **Render:** wrapped; timeout; failure → clear actionable error → agent retries; a labelled template
+  fallback only after retries are exhausted. The tool result ALWAYS tells the truth about what was
+  produced (`fallback: true/false`) — a template is never passed off as the generated film.
 - **Media:** `video`/`image` paths validated to reference assets already in the project (no arbitrary FS).
 
 ## Testing
@@ -157,7 +190,9 @@ on the v1 critical path). Recorded here and in the Pro-tier spec.
 - **Unit (sceneSpec):** valid specs pass; malformed/out-of-range/unknown-enum/bad-color rejected with
   the right path; clamps applied.
 - **Render (headless):** a representative SceneSpec renders to a non-blank MP4 of the expected dims/frames.
-- **Primitive frame tests:** each primitive renders visibly at a sample frame (via `render.mjs` single-frame).
+- **Primitive frame tests:** each primitive (incl. the premium set — mask/reveal, split/grid, DOF,
+  motion-blur, text-on-path, lighting-sweep, Ken Burns, stingers) renders visibly at a sample frame
+  (via `render.mjs` single-frame). Layer modifiers verified to compose with any element.
 - **Fallback:** a spec that forces a render error returns the template fallback + honest note.
 
 ## Quality gate (user judges before ship — BLOCKING)
