@@ -45,4 +45,28 @@ describe("validateSceneSpec", () => {
     const r = validateSceneSpec({ meta: { aspect: "16:9", fps: 30 }, beats: [] });
     expect(r.ok).toBe(false);
   });
+
+  it("rejects an unknown top-level field", () => {
+    const bad = { ...minimal, wat: "nope" };
+    const r = validateSceneSpec(bad);
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error).toMatch(/^\$: unknown field 'wat'/);
+  });
+
+  it("rejects an unknown field inside a nested layer", () => {
+    const bad = {
+      ...minimal,
+      beats: [{ durationInFrames: 60, layers: [{ element: "text", props: { text: "Hi" }, oppacity: 0.5 }] }],
+    };
+    const r = validateSceneSpec(bad);
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error).toMatch(/beats\[0\]\.layers\[0\]: unknown field 'oppacity'/);
+  });
+
+  it("rejects a non-string brand", () => {
+    const bad = { ...minimal, meta: { aspect: "16:9", fps: 30, brand: { nope: true } } };
+    const r = validateSceneSpec(bad);
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error).toMatch(/^meta\.brand/);
+  });
 });

@@ -198,14 +198,41 @@ function checkColor(value: unknown, path: string): string {
   return value;
 }
 
+/**
+ * Rejects any key on `obj` that isn't in `known`. Enforces the design spec's normative
+ * "Unknown field → validation error" rule at a single object level (fail loud, never
+ * silent-substitute — a typo'd key like `oppacity` must not be silently dropped).
+ * Intentionally NOT applied inside a layer's free-form `props` bag, which is per-element
+ * and not part of the structural spec.
+ */
+function checkUnknownKeys(obj: Record<string, unknown>, known: readonly string[], path: string): void {
+  for (const key of Object.keys(obj)) {
+    if (!known.includes(key)) {
+      fail(path, `unknown field '${key}'`);
+    }
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Nested validators — each returns a fully-defaulted, clamped object or throws ValidationError.
 // ---------------------------------------------------------------------------
+
+const POSITION_KEYS = ["x", "y"] as const;
+const CAMERA_KEYS = ["move", "amount"] as const;
+const BACKGROUND_KEYS = ["kind", "accent"] as const;
+const TRANSITION_OUT_KEYS = ["kind", "accent", "snapToBeat"] as const;
+const MASK_KEYS = ["shape", "reveal"] as const;
+const KEN_BURNS_KEYS = ["move", "amount"] as const;
+const LIGHTING_SWEEP_KEYS = ["on", "angle", "speed"] as const;
+const ENTER_KEYS = ["anim", "easing", "delay", "from", "snapToBeat"] as const;
+const EXIT_KEYS = ["anim", "at"] as const;
+const STYLE_KEYS = ["role", "size"] as const;
 
 function validatePosition(value: unknown, path: string): { x: number; y: number } {
   if (value === undefined) return { x: 0.5, y: 0.5 };
   if (!isPlainObject(value)) fail(path, "must be an object {x,y}");
   const obj = value as Record<string, unknown>;
+  checkUnknownKeys(obj, POSITION_KEYS, path);
   return {
     x: clamp(obj.x, 0, 1, 0.5),
     y: clamp(obj.y, 0, 1, 0.5),
@@ -216,6 +243,7 @@ function validateCamera(value: unknown, path: string): Camera | undefined {
   if (value === undefined) return undefined;
   if (!isPlainObject(value)) fail(path, "must be an object");
   const obj = value as Record<string, unknown>;
+  checkUnknownKeys(obj, CAMERA_KEYS, path);
   const move = checkEnum(obj.move, CAMERA_MOVES, `${path}.move`);
   const amount = clamp(obj.amount, 0, 0.3, 0);
   return { move, amount };
@@ -225,6 +253,7 @@ function validateBackground(value: unknown, path: string): Background | undefine
   if (value === undefined) return undefined;
   if (!isPlainObject(value)) fail(path, "must be an object");
   const obj = value as Record<string, unknown>;
+  checkUnknownKeys(obj, BACKGROUND_KEYS, path);
   const kind = checkEnum(obj.kind, BG_KINDS, `${path}.kind`);
   const accent = checkColor(obj.accent, `${path}.accent`);
   return { kind, accent };
@@ -234,6 +263,7 @@ function validateTransitionOut(value: unknown, path: string): TransitionOut | un
   if (value === undefined) return undefined;
   if (!isPlainObject(value)) fail(path, "must be an object");
   const obj = value as Record<string, unknown>;
+  checkUnknownKeys(obj, TRANSITION_OUT_KEYS, path);
   const kind = checkEnum(obj.kind, TRANSITIONS, `${path}.kind`);
   const accent = obj.accent === undefined ? BRAND_TOKENS.green : checkColor(obj.accent, `${path}.accent`);
   const snapToBeat = obj.snapToBeat === undefined ? false : Boolean(obj.snapToBeat);
@@ -244,6 +274,7 @@ function validateMask(value: unknown, path: string): Mask | undefined {
   if (value === undefined) return undefined;
   if (!isPlainObject(value)) fail(path, "must be an object");
   const obj = value as Record<string, unknown>;
+  checkUnknownKeys(obj, MASK_KEYS, path);
   const shape = checkEnum(obj.shape, MASK_SHAPES, `${path}.shape`);
   const reveal = obj.reveal === undefined ? "none" : checkEnum(obj.reveal, MASK_REVEALS, `${path}.reveal`);
   return { shape, reveal };
@@ -253,6 +284,7 @@ function validateKenBurns(value: unknown, path: string): KenBurns | undefined {
   if (value === undefined) return undefined;
   if (!isPlainObject(value)) fail(path, "must be an object");
   const obj = value as Record<string, unknown>;
+  checkUnknownKeys(obj, KEN_BURNS_KEYS, path);
   const move = checkEnum(obj.move, KEN_BURNS_MOVES, `${path}.move`);
   const amount = clamp(obj.amount, 0, 0.3, 0.08);
   return { move, amount };
@@ -262,6 +294,7 @@ function validateLightingSweep(value: unknown, path: string): LightingSweep | un
   if (value === undefined) return undefined;
   if (!isPlainObject(value)) fail(path, "must be an object");
   const obj = value as Record<string, unknown>;
+  checkUnknownKeys(obj, LIGHTING_SWEEP_KEYS, path);
   const on = obj.on === undefined ? false : Boolean(obj.on);
   const angle = clamp(obj.angle, 0, 360, 20);
   const speed = clamp(obj.speed, 0, 10, 1);
@@ -272,6 +305,7 @@ function validateEnter(value: unknown, path: string): Enter | undefined {
   if (value === undefined) return undefined;
   if (!isPlainObject(value)) fail(path, "must be an object");
   const obj = value as Record<string, unknown>;
+  checkUnknownKeys(obj, ENTER_KEYS, path);
   const anim = checkEnum(obj.anim, ANIMS, `${path}.anim`);
   const easing = obj.easing === undefined ? "ease-out" : checkEnum(obj.easing, EASINGS, `${path}.easing`);
   const delay = clamp(obj.delay, 0, 600, 0);
@@ -284,6 +318,7 @@ function validateExit(value: unknown, path: string): Exit | undefined {
   if (value === undefined) return undefined;
   if (!isPlainObject(value)) fail(path, "must be an object");
   const obj = value as Record<string, unknown>;
+  checkUnknownKeys(obj, EXIT_KEYS, path);
   const anim = checkEnum(obj.anim, EXIT_ANIMS, `${path}.anim`);
   const at = clamp(obj.at, 0, 600, 60);
   return { anim, at };
@@ -293,14 +328,21 @@ function validateStyle(value: unknown, path: string): LayerStyle | undefined {
   if (value === undefined) return undefined;
   if (!isPlainObject(value)) fail(path, "must be an object");
   const obj = value as Record<string, unknown>;
+  checkUnknownKeys(obj, STYLE_KEYS, path);
   const role = checkEnum(obj.role, STYLE_ROLES, `${path}.role`);
   const size = clamp(obj.size, 0.01, 0.4, 0.09);
   return { role, size };
 }
 
+const LAYER_KEYS = [
+  "element", "props", "position", "opacity", "blur", "depth", "mask", "motionBlur",
+  "kenBurns", "lightingSweep", "enter", "exit", "style",
+] as const;
+
 function validateLayer(value: unknown, path: string): Layer {
   if (!isPlainObject(value)) fail(path, "must be an object");
   const obj = value as Record<string, unknown>;
+  checkUnknownKeys(obj, LAYER_KEYS, path);
 
   const element = checkEnum(obj.element, ELEMENTS, `${path}.element`);
   const props = isPlainObject(obj.props) ? (obj.props as Record<string, unknown>) : {};
@@ -339,9 +381,12 @@ function validateLayer(value: unknown, path: string): Layer {
   return layer;
 }
 
+const BEAT_KEYS = ["durationInFrames", "camera", "background", "layers", "transitionOut"] as const;
+
 function validateBeat(value: unknown, path: string): Beat {
   if (!isPlainObject(value)) fail(path, "must be an object");
   const obj = value as Record<string, unknown>;
+  checkUnknownKeys(obj, BEAT_KEYS, path);
 
   const durationInFrames = clamp(obj.durationInFrames, 8, 600, 60);
 
@@ -362,13 +407,26 @@ function validateBeat(value: unknown, path: string): Beat {
   return beat;
 }
 
+const META_KEYS = ["aspect", "fps", "brand", "beatMarkers"] as const;
+
+// Upper bound for beatMarkers frame indices: at 120fps (the max meta.fps allowed above) this is
+// ~833s / ~13.9min of runway, comfortably beyond any realistic single generated clip. Ties the
+// clamp to the same "generous but not unbounded" rationale as the other numeric clamps in this
+// file rather than leaving 100000 as a magic number.
+const MAX_BEAT_MARKER_FRAME = 100000;
+
 function validateMeta(value: unknown, path: string): SceneMeta {
   if (!isPlainObject(value)) fail(path, "must be an object");
   const obj = value as Record<string, unknown>;
+  checkUnknownKeys(obj, META_KEYS, path);
 
   const aspect = checkEnum(obj.aspect, ASPECTS, `${path}.aspect`);
   const fps = clamp(obj.fps, 1, 120, 30);
-  const brand = obj.brand === undefined ? "kaestral" : String(obj.brand);
+
+  if (obj.brand !== undefined && typeof obj.brand !== "string") {
+    fail(`${path}.brand`, `must be a string, got '${String(obj.brand)}'`);
+  }
+  const brand = obj.brand === undefined ? "kaestral" : obj.brand;
 
   const meta: SceneMeta = { aspect, fps, brand };
 
@@ -383,7 +441,7 @@ function validateMeta(value: unknown, path: string): SceneMeta {
         fail(`${path}.beatMarkers[${i}]`, `must be a finite number, got '${String(v)}'`);
       }
     });
-    meta.beatMarkers = rawMarkers.map((v) => clamp(v, 0, 100000, 0));
+    meta.beatMarkers = rawMarkers.map((v) => clamp(v, 0, MAX_BEAT_MARKER_FRAME, 0));
   }
 
   return meta;
@@ -399,12 +457,15 @@ function validateMeta(value: unknown, path: string): SceneMeta {
  * offending path (e.g. `"beats[0].layers[2].element: unknown value 'foo' (allowed: text, ...)"`).
  * On success, all numeric fields are clamped into range and all defaults are filled in.
  */
+const SCENE_SPEC_KEYS = ["meta", "beats"] as const;
+
 export function validateSceneSpec(input: unknown): ValidationResult {
   try {
     if (!isPlainObject(input)) {
       fail("$", "SceneSpec must be an object");
     }
     const obj = input as Record<string, unknown>;
+    checkUnknownKeys(obj, SCENE_SPEC_KEYS, "$");
 
     const meta = validateMeta(obj.meta, "meta");
 
