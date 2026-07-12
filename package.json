@@ -1,10 +1,14 @@
 {
   "name": "kaestral",
-  "private": true,
   "version": "0.0.1",
   "type": "module",
-  "description": "Kaestral — AI-native video editor for Windows (a GPLv3 port of Palmier Pro). Tauri 2 + React + TypeScript.",
+  "description": "The AI-operated video editor for Windows. You describe the edit, it makes it — cut, caption, and edit by prompt over MCP. A GPLv3 port of Palmier Pro.",
   "license": "GPL-3.0-or-later",
+  "homepage": "https://github.com/prabindersinghh/kaestral",
+  "repository": { "type": "git", "url": "https://github.com/prabindersinghh/kaestral.git" },
+  "keywords": ["video-editor", "mcp", "claude", "ai", "ffmpeg", "windows", "video", "transcription", "whisper"],
+  "bin": { "kaestral": "bin/kaestral.mjs" },
+  "files": ["bin/", "dist-server/", "skills/", "public/", "vendor/whisper/", "remotion/src/", "remotion/package.json", "remotion/render.mjs", "README.md", "NOTICE.md", "LICENSE"],
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
@@ -14,7 +18,8 @@
     "typecheck": "tsc --noEmit",
     "tauri": "tauri",
     "mcp": "tsx src/mcp/main.ts",
-    "bundle:server": "node scripts/bundle-server.mjs"
+    "bundle:server": "node scripts/bundle-server.mjs",
+    "prepublishOnly": "npm run bundle:server"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",
