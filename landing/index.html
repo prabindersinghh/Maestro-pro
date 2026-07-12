@@ -119,7 +119,7 @@
 
   /* hero demo slot (GIF goes here) */
   .demo{position:relative;background:var(--bg-2);aspect-ratio:16/9;display:flex;align-items:center;justify-content:center}
-  .demo img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+  .demo img,.demo video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
   .demo .ph{position:relative;text-align:center;color:var(--ink-3);font-family:var(--mono);font-size:13px;letter-spacing:.03em;z-index:1;padding:24px}
   .demo .ph .play{width:60px;height:60px;border-radius:50%;border:1px solid var(--gold-line);display:flex;align-items:center;justify-content:center;margin:0 auto 16px;background:rgba(201,162,39,.05)}
   .demo .ph .play::after{content:"";border-left:16px solid var(--green-hi);border-top:10px solid transparent;border-bottom:10px solid transparent;margin-left:4px}
@@ -281,16 +281,11 @@
     </div>
     <p class="note">Free<span class="sep">·</span>GPLv3<span class="sep">·</span>Works with the Claude Code you already have</p>
 
-    <!-- Hero demo: replace assets/hero-demo.gif with your screen recording (prompt → edit). -->
+    <!-- Hero demo: a bespoke Kaestral motion-graphics film (rendered in Kaestral via Remotion). -->
     <div class="frame rev">
       <div class="bar"><i></i><i></i><i></i><span class="t">kaestral — editing from a prompt</span></div>
       <div class="demo">
-        <!-- <img src="assets/hero-demo.gif" alt="A prompt typed into Kaestral, and the timeline editing itself" /> -->
-        <div class="ph">
-          <div class="play"></div>
-          Hero demo — record a 20s prompt → edit and drop it here
-        </div>
-        <div class="scrub"></div>
+        <video src="assets/hero-demo.mp4" autoplay muted loop playsinline preload="auto" aria-label="Kaestral editing from a prompt — a prompt is typed, the timeline responds, the edit is made"></video>
       </div>
     </div>
   </div>

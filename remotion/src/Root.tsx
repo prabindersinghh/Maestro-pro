@@ -4,6 +4,7 @@ import { KaestralLaunch } from "./compositions/KaestralLaunch";
 import { LogoReveal } from "./compositions/LogoReveal";
 import { DataViz } from "./compositions/DataViz";
 import { Transition } from "./compositions/Transition";
+import { HeroDemo } from "./compositions/HeroDemo";
 
 const FPS = 30;
 const W = 1920;
@@ -16,6 +17,11 @@ const dur = ({ props }: { props: { durationSeconds?: number } }) => ({
 
 export const RemotionRoot: React.FC = () => (
   <>
+    <Composition
+      id="HeroDemo" component={HeroDemo} fps={FPS} width={W} height={H} durationInFrames={300}
+      defaultProps={{ accent: "#16b16a", durationSeconds: 10 }}
+      calculateMetadata={dur}
+    />
     <Composition
       id="KaestralLaunch" component={KaestralLaunch} fps={FPS} width={W} height={H} durationInFrames={1800}
       defaultProps={{ durationSeconds: 60 }}
