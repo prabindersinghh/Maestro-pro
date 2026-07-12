@@ -13,9 +13,17 @@ import { BarChart } from "./BarChart";
 import { LineChart } from "./LineChart";
 import { AreaChart } from "./AreaChart";
 import { Counter } from "./Counter";
+import { Image } from "./Image";
+import { Video } from "./Video";
+import { ScreenMock } from "./ScreenMock";
+import { Arrow } from "./Arrow";
+import { HighlightBox } from "./HighlightBox";
+import { PointerLine } from "./PointerLine";
+import { SpotlightDim } from "./SpotlightDim";
 
 export { Particles, Hairline };
 export { Waveform, Timeline, CaptionKaraoke, BarChart, LineChart, AreaChart, Counter };
+export { Image, Video, ScreenMock, Arrow, HighlightBox, PointerLine, SpotlightDim };
 export { Camera, DEFAULT_CAMERA, cameraTransform, parallaxOffset, rackBlurFor } from "./Camera";
 export type { CameraSpec } from "./Camera";
 export { applyTransition, TRANSITION_FRAMES } from "./Transitions";
@@ -39,6 +47,13 @@ export { Grid, GlowField };
 // TASK 7 UPGRADE — "show the product working" (binding critique #7): waveform/timeline/
 // captionKaraoke (editor motifs, ported from CondenseReel.tsx/HeroDemo.tsx) plus barChart/
 // lineChart/areaChart/counter (data-story primitives) now render real content instead of Noop.
+//
+// TASK 8 UPGRADE — MEDIA (video/image/screenMock) + CALLOUT (arrow/highlightBox/pointerLine/
+// spotlightDim) primitives now render real content instead of Noop. These let a generated film
+// show the ACTUAL product (screenshots/clips framed in device chrome) with "look here" annotations
+// — the other half of "show the product working" alongside Task 7's editor motifs. `props.src`
+// on video/image/screenMock is pre-validated against the project's media allowlist by
+// `validateSceneSpec` (src/gen/sceneSpec.ts) before it ever reaches these primitives.
 
 /** Renders nothing. Placeholder for elements not yet implemented as primitives. */
 export const Noop: React.FC<PrimitiveProps> = () => null;
@@ -46,9 +61,9 @@ export const Noop: React.FC<PrimitiveProps> = () => null;
 export const REGISTRY: Record<string, React.FC<PrimitiveProps>> = {
   text: Text,
   textOnPath: Noop,
-  video: Noop,
-  image: Noop,
-  screenMock: Noop,
+  video: Video,
+  image: Image,
+  screenMock: ScreenMock,
   waveform: Waveform,
   timeline: Timeline,
   logo: LogoMark,
@@ -60,10 +75,10 @@ export const REGISTRY: Record<string, React.FC<PrimitiveProps>> = {
   counter: Counter,
   captionKaraoke: CaptionKaraoke,
   particles: Particles,
-  arrow: Noop,
-  highlightBox: Noop,
-  pointerLine: Noop,
-  spotlightDim: Noop,
+  arrow: Arrow,
+  highlightBox: HighlightBox,
+  pointerLine: PointerLine,
+  spotlightDim: SpotlightDim,
   splitLayout: Noop,
   gridLayout: Noop,
   countdown: Noop,

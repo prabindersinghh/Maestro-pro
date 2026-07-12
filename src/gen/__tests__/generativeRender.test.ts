@@ -4,6 +4,8 @@ import { validateSceneSpec } from "../sceneSpec";
 import { join } from "node:path";
 import { statSync } from "node:fs";
 
+const sampleImagePath = join(process.cwd(), "public", "sample-image.png");
+
 const remotionDir = join(process.cwd(), "remotion");
 
 describe("Generative render", () => {
@@ -138,5 +140,47 @@ describe("Generative render", () => {
     expect(res.width).toBe(1920);
     expect(res.height).toBe(1080);
     expect(statSync(out).size).toBeGreaterThan(10000);
+  }, 240000);
+
+  it("renders a screenMock (real product screenshot) + arrow + highlightBox — 'show the product' primitives", async () => {
+    const v = validateSceneSpec(
+      {
+        meta: { aspect: "16:9", fps: 30 },
+        beats: [
+          {
+            durationInFrames: 60,
+            background: { kind: "glow", accent: "#16b16a" },
+            layers: [
+              {
+                element: "screenMock",
+                props: { src: sampleImagePath, url: "kaestral.dev" },
+                position: { x: 0.5, y: 0.5 },
+                enter: { anim: "spring" },
+              },
+              {
+                element: "arrow",
+                props: { from: { x: 0.15, y: 0.15 }, to: { x: 0.4, y: 0.35 } },
+                enter: { anim: "draw" },
+              },
+              {
+                element: "highlightBox",
+                props: { rect: { x: 0.3, y: 0.25, w: 0.35, h: 0.2 } },
+                enter: { anim: "draw" },
+              },
+            ],
+          },
+        ],
+      },
+      { allowedMediaPaths: [sampleImagePath] },
+    );
+    expect(v.ok).toBe(true);
+    if (!v.ok) return;
+    const out = join(remotionDir, ".test-out", "gen-screenmock.mp4");
+    const res = await renderRemotion("Generative", { spec: v.spec }, out, remotionDir);
+    expect(res.width).toBe(1920);
+    expect(res.height).toBe(1080);
+    // Real screenshot content composited into the chrome should compress noticeably larger than a
+    // flat background alone — a coarse but effective "actually rendered, not blank" proxy.
+    expect(statSync(out).size).toBeGreaterThan(15000);
   }, 240000);
 });

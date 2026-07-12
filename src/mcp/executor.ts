@@ -449,13 +449,32 @@ export class McpExecutor {
     return okJson({ assetId: asset.id, name: asset.name, template, frames: res.durationInFrames, width: res.width, height: res.height, engine: "remotion", placed: place });
   }
 
+  // Every absolute path a `video`/`image`/`screenMock` layer's `props.src` is allowed to reference:
+  // every project media asset (resolved the same way the render pipeline resolves clips —
+  // `resolveRenderMediaPath`, so "project"-relative sources land under the same publicDir/projectDir
+  // roots) plus the bundled public/ sample assets (sample-image.png/sample-video.mp4) so specs can
+  // demo against the sample media even before the user has imported anything. Skips assets that
+  // don't resolve to a real path (e.g. an external http(s) source) rather than failing — those are
+  // simply not eligible `src` values.
+  private knownMediaPaths(): string[] {
+    const paths = new Set<string>();
+    for (const asset of this.media.assets) {
+      const p = resolveRenderMediaPath(asset.source, this.projectDir ?? ".", publicDir());
+      if (p) paths.add(p);
+    }
+    paths.add(join(publicDir(), "sample-image.png"));
+    paths.add(join(publicDir(), "sample-video.mp4"));
+    paths.add(join(publicDir(), "sample-audio.m4a"));
+    return [...paths];
+  }
+
   // compose_motion (STRATEGY ③ — the Generative engine): validate an agent-authored SceneSpec, render
   // it via the "Generative" Remotion composition, import + place the result. Fail loud: a validation
   // error returns immediately (no render attempted). Only if a REAL render attempt throws do we fall
   // back to a deterministic template — and that result is always labelled fallback:true with a reason,
   // never presented as if it were the bespoke generative render.
   private async composeMotion(a: Args): Promise<ToolResult> {
-    const v = validateSceneSpec((a as any).spec);
+    const v = validateSceneSpec((a as any).spec, { allowedMediaPaths: this.knownMediaPaths() });
     if (!v.ok) return err(`compose_motion: ${v.error}`);
 
     const place = aBool(a, "place") !== false;

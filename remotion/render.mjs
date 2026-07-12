@@ -6,7 +6,7 @@
 
 import { bundle } from "@remotion/bundler";
 import { selectComposition, renderMedia, ensureBrowser } from "@remotion/renderer";
-import { existsSync, readFileSync, writeFileSync, mkdirSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync, mkdirSync, statSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -18,6 +18,46 @@ if (!compId || !outArg) {
 }
 const inputProps = propsJson ? JSON.parse(propsJson) : {};
 const outputLocation = path.resolve(outArg);
+
+// Media/image/screenMock layers (Task 8) carry `props.src` as an absolute filesystem path
+// (pre-validated against the project's media allowlist by validateSceneSpec). Neither Remotion's
+// <Img> nor <OffthreadVideo> can load a bare absolute path directly: <Img> resolves it to a
+// browser file:// navigation, which chrome-headless-shell's stripped network stack rejects
+// (net::ERR_UNKNOWN_URL_SCHEME) even with disableWebSecurity; <OffthreadVideo>'s proxy server only
+// accepts http(s) URLs or `data:` URIs (see downloadAsset in @remotion/renderer), never a raw OS
+// path either. The one input format BOTH primitives support with no browser network stack
+// involved at all is a `data:` URI — so we inline any such `src` here, at the single Node-side
+// choke point BEFORE the spec ever reaches the browser-rendered bundle. This runs once per render
+// (not per-frame), so the cost is one file read + base64 encode per referenced asset.
+const MEDIA_SRC_ELEMENTS = new Set(["video", "image", "screenMock"]);
+const MIME_BY_EXT = {
+  ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".webp": "image/webp", ".gif": "image/gif",
+  ".mp4": "video/mp4", ".mov": "video/quicktime", ".webm": "video/webm",
+};
+
+function inlineMediaSrcs(spec) {
+  if (!spec || !Array.isArray(spec.beats)) return spec;
+  for (const beat of spec.beats) {
+    if (!Array.isArray(beat.layers)) continue;
+    for (const layer of beat.layers) {
+      if (!MEDIA_SRC_ELEMENTS.has(layer.element)) continue;
+      const src = layer.props && layer.props.src;
+      if (typeof src !== "string" || src === "" || src.startsWith("data:") || /^https?:\/\//i.test(src)) continue;
+      if (!existsSync(src)) continue; // fail loud downstream (missing file), not here
+      const ext = path.extname(src).toLowerCase();
+      const mime = MIME_BY_EXT[ext] ?? "application/octet-stream";
+      const size = statSync(src).size;
+      // Guard against inlining huge files into the render's inputProps JSON (memory/perf) — large
+      // videos should be trimmed/transcoded upstream rather than base64-inlined whole.
+      const MAX_INLINE_BYTES = 25 * 1024 * 1024;
+      if (size > MAX_INLINE_BYTES) continue;
+      const b64 = readFileSync(src).toString("base64");
+      layer.props.src = `data:${mime};base64,${b64}`;
+    }
+  }
+  return spec;
+}
+if (inputProps && inputProps.spec) inlineMediaSrcs(inputProps.spec);
 
 async function getServeUrl() {
   // Cache the webpack bundle so only the first render pays the bundling cost.
@@ -35,9 +75,11 @@ async function getServeUrl() {
   return serveUrl;
 }
 
+const chromiumOptions = { gl: "angle" };
+
 await ensureBrowser();
 const serveUrl = await getServeUrl();
-const composition = await selectComposition({ serveUrl, id: compId, inputProps });
+const composition = await selectComposition({ serveUrl, id: compId, inputProps, chromiumOptions });
 await renderMedia({
   composition,
   serveUrl,
@@ -45,7 +87,7 @@ await renderMedia({
   outputLocation,
   inputProps,
   // headless Chromium flags that are robust across machines (incl. no-GPU Windows CI/VMs)
-  chromiumOptions: { gl: "angle" },
+  chromiumOptions,
 });
 
 console.log(JSON.stringify({

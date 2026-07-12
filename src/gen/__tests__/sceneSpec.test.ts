@@ -1,6 +1,7 @@
 // src/gen/__tests__/sceneSpec.test.ts
 import { describe, it, expect } from "vitest";
 import { validateSceneSpec } from "../sceneSpec";
+import { join } from "node:path";
 
 const minimal = {
   meta: { aspect: "16:9", fps: 30 },
@@ -68,5 +69,72 @@ describe("validateSceneSpec", () => {
     const r = validateSceneSpec(bad);
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.error).toMatch(/^meta\.brand/);
+  });
+
+  describe("media-path allowlist (opts.allowedMediaPaths)", () => {
+    const allowedPath = join(process.cwd(), "public", "sample-image.png");
+    const outsidePath = join(process.cwd(), "..", "somewhere-else", "evil.png");
+
+    const specWithImage = (src: string) => ({
+      meta: { aspect: "16:9", fps: 30 },
+      beats: [
+        {
+          durationInFrames: 60,
+          layers: [
+            { element: "text", props: { text: "Hi" } },
+            { element: "image", props: { src } },
+          ],
+        },
+      ],
+    });
+
+    it("rejects an image src NOT in allowedMediaPaths, naming the exact path", () => {
+      const r = validateSceneSpec(specWithImage(outsidePath), { allowedMediaPaths: [allowedPath] });
+      expect(r.ok).toBe(false);
+      if (!r.ok) {
+        expect(r.error).toMatch(/beats\[0\]\.layers\[1\]\.props\.src/);
+        expect(r.error).toMatch(/not in project media/);
+      }
+    });
+
+    it("accepts an image src that IS in allowedMediaPaths", () => {
+      const r = validateSceneSpec(specWithImage(allowedPath), { allowedMediaPaths: [allowedPath] });
+      expect(r.ok).toBe(true);
+    });
+
+    it("accepts case-insensitive/normalized path matches on the allowlist", () => {
+      const upper = allowedPath.toUpperCase();
+      const r = validateSceneSpec(specWithImage(upper), { allowedMediaPaths: [allowedPath] });
+      expect(r.ok).toBe(true);
+    });
+
+    it("skips the media-path check entirely when opts is absent (back-compat)", () => {
+      const r = validateSceneSpec(specWithImage(outsidePath));
+      expect(r.ok).toBe(true);
+    });
+
+    it("applies the same check to video and screenMock elements", () => {
+      const videoSpec = {
+        meta: { aspect: "16:9", fps: 30 },
+        beats: [{ durationInFrames: 60, layers: [{ element: "video", props: { src: outsidePath } }] }],
+      };
+      const screenMockSpec = {
+        meta: { aspect: "16:9", fps: 30 },
+        beats: [{ durationInFrames: 60, layers: [{ element: "screenMock", props: { src: outsidePath } }] }],
+      };
+      const rv = validateSceneSpec(videoSpec, { allowedMediaPaths: [allowedPath] });
+      const rs = validateSceneSpec(screenMockSpec, { allowedMediaPaths: [allowedPath] });
+      expect(rv.ok).toBe(false);
+      expect(rs.ok).toBe(false);
+    });
+
+    it("ignores non-string / empty src (nothing to check)", () => {
+      const spec = {
+        meta: { aspect: "16:9", fps: 30 },
+        beats: [{ durationInFrames: 60, layers: [{ element: "image", props: { src: "" } }] }],
+      };
+      const r = validateSceneSpec(spec, { allowedMediaPaths: [allowedPath] });
+      expect(r.ok).toBe(true);
+    });
   });
 });

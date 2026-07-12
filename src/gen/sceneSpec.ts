@@ -1,8 +1,10 @@
 // SceneSpec — the declarative contract the agent emits to describe a generated video. Pure module:
-// no rendering, no imports beyond Node/TS. `validateSceneSpec` is the single trusted gate between
+// no rendering, only node:path beyond Node/TS. `validateSceneSpec` is the single trusted gate between
 // agent-authored JSON and the Generative.tsx interpreter — it never throws, and on failure it names
 // the exact offending path so the agent can self-correct and retry (fail loud, never silent-substitute).
 // See docs/superpowers/specs/2026-07-12-generative-motion-engine-design.md for the full design.
+
+import { normalize } from "node:path";
 
 // ---------------------------------------------------------------------------
 // Closed enums (exported for reuse by later tasks: Generative.tsx, compose_motion tool, etc.)
@@ -339,13 +341,50 @@ const LAYER_KEYS = [
   "kenBurns", "lightingSweep", "enter", "exit", "style",
 ] as const;
 
-function validateLayer(value: unknown, path: string): Layer {
+// Elements whose `props.src` names a real on-disk media file — these are the ones the media-path
+// allowlist (see ValidateOpts below) must guard, since they're the only elements that can point the
+// renderer at an arbitrary absolute path.
+const MEDIA_SRC_ELEMENTS = new Set(["video", "image", "screenMock"]);
+
+/** Normalizes a path for comparison: node:path normalize + lowercase (Windows paths are case-insensitive). */
+function normalizeForCompare(p: string): string {
+  return normalize(p).toLowerCase();
+}
+
+/**
+ * Validates that a media-bearing layer's `props.src` (when present and non-empty) resolves to one
+ * of the caller-supplied allowed absolute paths. Skipped entirely when `allowedMediaPaths` is
+ * undefined (back-compat for callers — e.g. render tests — that don't pass opts). This is the
+ * only place SceneSpec validation reaches into a layer's free-form `props` bag, and only to block
+ * path traversal / arbitrary filesystem reads, per Task 8's media-path security requirement.
+ */
+function checkMediaPath(element: string, props: Record<string, unknown>, allowedMediaPaths: string[] | undefined, path: string): void {
+  if (allowedMediaPaths === undefined) return;
+  if (!MEDIA_SRC_ELEMENTS.has(element)) return;
+  const src = props.src;
+  if (typeof src !== "string" || src === "") return;
+  const normalizedSrc = normalizeForCompare(src);
+  const allowed = allowedMediaPaths.some((p) => normalizeForCompare(p) === normalizedSrc);
+  if (!allowed) {
+    fail(`${path}.props.src`, `not in project media: '${src}'`);
+  }
+}
+
+export interface ValidateOpts {
+  /** Absolute paths of media assets known to the project. When provided, every video/image/
+   * screenMock layer's `props.src` (if set) must match one of these exactly (path-normalized,
+   * case-insensitive) or validation fails loud, naming the offending path. */
+  allowedMediaPaths?: string[];
+}
+
+function validateLayer(value: unknown, path: string, opts: ValidateOpts | undefined): Layer {
   if (!isPlainObject(value)) fail(path, "must be an object");
   const obj = value as Record<string, unknown>;
   checkUnknownKeys(obj, LAYER_KEYS, path);
 
   const element = checkEnum(obj.element, ELEMENTS, `${path}.element`);
   const props = isPlainObject(obj.props) ? (obj.props as Record<string, unknown>) : {};
+  checkMediaPath(element, props, opts?.allowedMediaPaths, path);
   const position = validatePosition(obj.position, `${path}.position`);
   const opacity = clamp(obj.opacity, 0, 1, 1);
   const blur = clamp(obj.blur, 0, 24, 0);
@@ -383,7 +422,7 @@ function validateLayer(value: unknown, path: string): Layer {
 
 const BEAT_KEYS = ["durationInFrames", "camera", "background", "layers", "transitionOut"] as const;
 
-function validateBeat(value: unknown, path: string): Beat {
+function validateBeat(value: unknown, path: string, opts: ValidateOpts | undefined): Beat {
   if (!isPlainObject(value)) fail(path, "must be an object");
   const obj = value as Record<string, unknown>;
   checkUnknownKeys(obj, BEAT_KEYS, path);
@@ -393,7 +432,7 @@ function validateBeat(value: unknown, path: string): Beat {
   if (!Array.isArray(obj.layers) || obj.layers.length === 0) {
     fail(`${path}.layers`, "must be a non-empty array");
   }
-  const layers = (obj.layers as unknown[]).map((l, i) => validateLayer(l, `${path}.layers[${i}]`));
+  const layers = (obj.layers as unknown[]).map((l, i) => validateLayer(l, `${path}.layers[${i}]`, opts));
 
   const camera = validateCamera(obj.camera, `${path}.camera`);
   const background = validateBackground(obj.background, `${path}.background`);
@@ -456,10 +495,15 @@ function validateMeta(value: unknown, path: string): SceneMeta {
  * failures are caught and surfaced as `{ ok:false, error }`, where `error` names the exact
  * offending path (e.g. `"beats[0].layers[2].element: unknown value 'foo' (allowed: text, ...)"`).
  * On success, all numeric fields are clamped into range and all defaults are filled in.
+ *
+ * `opts.allowedMediaPaths`, when provided, additionally enforces that every video/image/screenMock
+ * layer's `props.src` (if set) resolves to one of the given absolute paths — blocking path
+ * traversal / arbitrary filesystem reads from an agent-authored spec. Omitting `opts` entirely
+ * skips this check (back-compat for callers, e.g. render tests, that don't track project media).
  */
 const SCENE_SPEC_KEYS = ["meta", "beats"] as const;
 
-export function validateSceneSpec(input: unknown): ValidationResult {
+export function validateSceneSpec(input: unknown, opts?: ValidateOpts): ValidationResult {
   try {
     if (!isPlainObject(input)) {
       fail("$", "SceneSpec must be an object");
@@ -472,7 +516,7 @@ export function validateSceneSpec(input: unknown): ValidationResult {
     if (!Array.isArray(obj.beats) || obj.beats.length === 0) {
       fail("beats", "must be a non-empty array");
     }
-    const beats = (obj.beats as unknown[]).map((b, i) => validateBeat(b, `beats[${i}]`));
+    const beats = (obj.beats as unknown[]).map((b, i) => validateBeat(b, `beats[${i}]`, opts));
 
     const spec: SceneSpec = { meta, beats };
     return { ok: true, spec };

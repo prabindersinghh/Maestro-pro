@@ -13,3 +13,7 @@ src-tauri/resources/
 # Downloaded Whisper model weights (download-on-first-use)
 models/
 vendor/whisper/*.bin
+
+# Rendered MP4s from generativeRender.test.ts / other Remotion render tests
+remotion/.test-out/
+remotion/.bundle-cache/
