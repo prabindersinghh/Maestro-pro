@@ -1,90 +1,128 @@
 # Kaestral
 
-**An AI-native video editor for Windows.** Edit on a real multi-track timeline — or let Claude edit
-for you over MCP. Import your footage, cut it by hand or by prompt, and export a real MP4.
+**The AI-operated video editor for Windows. You describe the edit. It makes it.**
 
-Kaestral is an open-source (GPLv3) Windows port of [Palmier Pro](https://github.com/palmier-io/palmier-pro)
-(© Palmier Inc.), rebuilt on **Tauri 2 + React + TypeScript** with an **FFmpeg** render pipeline. It keeps
-Palmier's project format (`.palmier`) and its full **41-tool MCP contract**, so agents and configs built
-for Palmier work against Kaestral unchanged. Full credit and the port→upstream file map: [NOTICE.md](./NOTICE.md).
+A kestrel watches with total precision, then strikes. Kaestral watches your footage, hears every
+word, and cuts. Type *"cut the boring parts, add captions, punch in on the hook"* — and watch your
+timeline change.
+
+Works with the **Claude Code** you already have (free), or in-app chat. Built on a real pro timeline —
+so when the AI is done, you can still touch every frame.
+
+> **Why Windows?** The AI-native editor (Palmier Pro) is macOS-only. Kaestral brings it to Windows —
+> the 70% they don't serve — and gives it eyes and ears they don't have.
 
 ---
 
-## What works today (each verified end-to-end)
+## What it does
 
-- **The real loop:** import your own video (file picker or drag-drop) → see its true pixels on the
-  preview and timeline → connect Claude over MCP and prompt edits to *that* project → export an MP4
-  containing your footage.
-- **Editor:** multi-track timeline (ruler, playhead, drag with snapping, split, delete, undo/redo,
-  zoom), frame-accurate composited preview (transforms, crop, opacity, 16 blend modes, keyframes,
-  titles), inspector (speed/volume/opacity/blend/transform + keyframe stamping), media panel.
-- **Shared project state:** the app and the MCP server edit the *same* project live — your changes and
-  Claude's merge in real time.
-- **MCP server:** `kaestral` v1.0.0 on `http://127.0.0.1:19789/mcp` (localhost-only), all 41 tools
-  with Palmier's exact names/schemas. Generation tools honestly report signed-out (no cloud).
-- **Export:** H.264 / H.265 / ProRes video via FFmpeg, plus XMEML (Premiere), FCPXML (Resolve/FCP),
-  and `.palmier` package.
-- **Format parity:** `.palmier` projects round-trip (`project.json` / `media.json` semantics ported
-  field-by-field from the Swift source).
+### 🎬 AI-operated. You direct, it edits.
+Describe the edit in plain language and watch it happen on your timeline — cut, caption, punch in,
+grade, add a title. Every action runs through the editor's tools, so the result is a real, editable
+project, not a black-box export. Drive it with **Claude Code** (free, terminal) or the **in-app chat**.
 
-**Honest gaps** (ranked): see [UPGRADES.md](./UPGRADES.md) — top items are smooth real-time playback
-(preview currently seeks per frame), audio (waveforms/monitoring/mix-in-export), and pixel-exact
-color kernels (LUT/curves/wheels render approximately in preview today).
+### ⚡ Raw footage → publish-ready reel.
+Drop a 20-minute recording; get a tight, captioned, beat-cut short. Kaestral **removes filler words**,
+**finds the hook**, and **captions on the word** — automatically. Speech is transcribed on-device; cuts
+land on silences and beats.
 
-## Quickstart
+### 📊 Make SaaS & product videos without an editor.
+Animated intros, logo reveals, data-viz, and transition stingers — **generated from a sentence** and
+rendered onto your timeline. Launch videos, demos, and ads, without hiring an editor.
 
-Prereqs: **Node 20+**, **Rust** (`rustup`, stable), **FFmpeg + ffprobe on PATH**, Windows 10/11.
+*...plus the full editor underneath:*
 
+- **Real pro timeline** — multi-track, ruler + playhead, drag-with-snapping, split, ripple-delete,
+  undo/redo, keyframes, 16 blend modes, frame-accurate composited preview.
+- **Perception** — word-level transcription (whisper, on-device), frame **vision** (the AI actually
+  sees your footage), beat/silence detection, color-palette extraction.
+- **Motion graphics** — titles (canvas) + Remotion templates from a prompt.
+- **Color** — grade with wheels, curves, LUTs, temperature.
+- **Import from anywhere** — files, drag-drop, or a URL (`import_from_url`, via your `yt-dlp`).
+- **Export** — H.264 / H.265 / ProRes, plus **Premiere (XMEML)**, **Resolve/FCP (FCPXML)**, and
+  `.palmier`.
+- **Editing playbooks (skills)** — viral-reel, beat-sync, creative-director, captions, b-roll,
+  platform-delivery, promo/ad. The AI reads them and follows pro workflows.
+
+**48+ MCP tools.** A full editor the AI operates like a pair of hands.
+
+---
+
+## How it works (the proof)
+
+On-device **whisper** for word-level transcription · **frame vision** so the model sees the footage ·
+**beat/silence detection** for rhythmic cuts · **palette extraction** for on-brand color · **Remotion**
+motion graphics · an **MCP server** exposing 48+ tools · a full multi-track timeline · **H.264/H.265/
+ProRes** render + **Premiere/Resolve** interchange export. No cloud required for any of it.
+
+## Pro (waitlist)
+**AI video generation — coming soon.** Type a prompt, get a real clip on your timeline. Generate video,
+images, and B-roll inside Kaestral. [Join the waitlist](#) from the app's **✨ Pro** button.
+
+---
+
+## Get it
+
+Kaestral is designed to be adopted **MCP-first** — the fastest way in is to point the Claude Code you
+already have at it.
+
+### 1. MCP server (primary — one line)
 ```bash
-git clone https://github.com/prabindersinghh/Kaestral-pro
-cd Kaestral-pro
-npm install
-npm run tauri dev     # opens the Kaestral window (auto-starts the project server)
-```
-
-In the app: **＋ Import** (or drop a file anywhere) → click the asset to place it at the playhead →
-scrub the ruler, **Space** to play, **S** split, **Del** delete, **Ctrl+Z** undo → **⭳ Export MP4**.
-
-## Let Claude edit your video
-
-```bash
-# the app auto-starts the project server; or run it standalone:
-npm run mcp
-
-# then point Claude Code at it:
-claude mcp add --transport http kaestral http://127.0.0.1:19789/mcp
+npx kaestral            # starts the local editor engine on http://127.0.0.1:19789/mcp
+claude mcp add --transport http palmier-pro http://127.0.0.1:19789/mcp
 claude
 ```
+Then just ask: *"get_timeline, then cut the silent parts of demo.mp4, add captions, and export it."*
 
-Ask things like: *“Call get_timeline, then cut the first 2 seconds of my-vacation.mp4, add a title
-that says ‘Trip 2026’, and export the project as video to C:\Users\me\Videos\trip.mp4.”*
-Claude's edits appear in the Kaestral window live; your manual edits are visible to Claude the same way.
+### 2. Windows installer
+Download **Kaestral_x64-setup.exe** from [Releases](https://github.com/prabindersinghh/kaestral/releases).
+Double-click — the editor and its engine start internally (no terminal, no npm).
+
+### 3. From source
+```bash
+git clone https://github.com/prabindersinghh/kaestral
+cd kaestral && npm install
+npm run tauri dev
+```
+
+### macOS
+Roadmap. Kaestral is Windows-first by design (that's the wedge). macOS is planned once Windows lands.
+
+---
+
+## Honest comparison — Kaestral vs Palmier Pro
+
+| | **Kaestral** | **Palmier Pro** |
+|---|---|---|
+| Platform | **Windows** (macOS on roadmap) | macOS only |
+| AI editing over MCP | ✅ | ✅ (the original) |
+| Perception (transcribe/see/beats) | ✅ on-device | ✅ |
+| AI video **generation** | ⏳ Pro (waitlist) | ✅ **paid cloud (shipping)** |
+| Maturity | new, open-source | established, funded (YC S24) |
+| Price | free, GPLv3 | paid |
+| The format & MCP contract | **theirs** (`.palmier`, palmier-pro) | theirs |
+
+**Where Palmier wins:** they ship AI generation today and they're more mature. Kaestral doesn't compete
+on generation — that's their paid cloud and our deferred Pro tier. Kaestral's edge is **Windows + real
+perception + a free, open, Claude-Code-native workflow.**
+
+## Why the MCP server is named `palmier-pro`
+Kaestral is a Windows port of Palmier Pro. To stay a **drop-in** for the Palmier ecosystem, the MCP
+server identifies as **`palmier-pro`** and speaks the **`.palmier`** project format — so agents,
+configs, and MCP clients built for Palmier work against Kaestral unchanged. This is a frozen
+compatibility contract; the *product* is Kaestral, the *wire protocol* is palmier-pro on purpose.
 
 ## Development
-
 ```bash
-npm test           # 127 tests: format round-trip, edit-engine invariants, MCP contract, exporters, render
+npm test           # 190 tests: format round-trip, edit engine, MCP contract, perception, render
 npm run typecheck  # strict TS
 npm run build      # production frontend
 ```
 
-```
-src/model/       .palmier format (Timeline/Clip/keyframes/effects) — ported from Sources/PalmierPro/Models
-src/engine/      headless edit engine (ripple/sync-lock/linked A/V/trim math) — EditorViewModel+*
-src/mcp/         MCP server + 41 tools + shared project state — Agent/MCP, Agent/Tools
-src/compositor/  frame compositing + preview (real decoded pixels) — Compositing/FrameRenderer
-src/export/      XMEML + FCPXML exporters — Export/XMLExporter, FCPXMLExporter
-src/render/      FFmpeg H.264/H.265/ProRes render — Export/ExportService semantics
-src/ui/          timeline, inspector, media panel — Timeline/, Inspector/, MediaPanel/
-src-tauri/       Tauri 2 shell (window, dialogs, render command)
-docs/            SPEC.md (frozen contract) + PROGRESS.md (verified gate ledger)
-```
-
 ## License & credit
-
-**GPLv3** — Kaestral is a derivative work of **Palmier Pro** by Palmier Inc.
+**GPLv3.** Kaestral is a derivative work of **Palmier Pro** by Palmier Inc.
 ([palmier-io/palmier-pro](https://github.com/palmier-io/palmier-pro), GPLv3), re-implemented for
-Windows using the Swift source as the executable specification. The `.palmier` format, MCP tool
-contract, and editing semantics are theirs; the Windows implementation is this repo. Palmier's
-proprietary cloud generation backend is not part of the upstream repo and is not ported — generation
-tools return a clean “signed-out” response. See [LICENSE](./LICENSE) and [NOTICE.md](./NOTICE.md).
+Windows using the Swift source as an executable specification. The `.palmier` format, MCP contract,
+and editing semantics are theirs; the Windows implementation is this repo. Palmier's proprietary cloud
+generation backend is not part of the upstream repo and is not ported. Third-party components
+(whisper.cpp, FFmpeg, Remotion, etc.) retain their own permissive licenses — see [NOTICE.md](./NOTICE.md).
