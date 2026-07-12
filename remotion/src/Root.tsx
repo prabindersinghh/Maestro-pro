@@ -6,6 +6,7 @@ import { DataViz } from "./compositions/DataViz";
 import { Transition } from "./compositions/Transition";
 import { HeroDemo } from "./compositions/HeroDemo";
 import { CondenseReel } from "./compositions/CondenseReel";
+import { Generative, totalDuration, dimsForAspect, type GenerativeProps } from "./compositions/Generative";
 
 const FPS = 30;
 const W = 1920;
@@ -15,6 +16,42 @@ const H = 1080;
 const dur = ({ props }: { props: { durationSeconds?: number } }) => ({
   durationInFrames: Math.max(1, Math.round((props.durationSeconds ?? 4) * FPS)),
 });
+
+// Minimal valid SceneSpec used only as defaultProps for the Studio preview / composition list —
+// real renders always pass an explicit `spec` validated by `validateSceneSpec` (src/gen/sceneSpec.ts).
+const MINIMAL_SPEC: GenerativeProps["spec"] = {
+  meta: { aspect: "16:9", fps: FPS },
+  beats: [
+    {
+      durationInFrames: 60,
+      background: { kind: "glow", accent: "#16b16a" },
+      layers: [
+        {
+          element: "text",
+          props: { text: "Kaestral" },
+          position: { x: 0.5, y: 0.5 },
+          opacity: 1,
+          blur: 0,
+          style: { role: "display", size: 0.1 },
+          enter: { anim: "spring", easing: "ease-out", delay: 0, from: "below", snapToBeat: false },
+        },
+      ],
+    },
+  ],
+};
+
+// durationInFrames + width/height derive from the SceneSpec itself (sum of beats' durations,
+// meta.aspect -> pixel dims) rather than a flat `durationSeconds` prop, since a Generative render
+// carries an arbitrary number of variable-length beats.
+const generativeMetadata = ({ props }: { props: GenerativeProps }) => {
+  const { width, height } = dimsForAspect(props.spec.meta.aspect);
+  return {
+    durationInFrames: Math.max(1, totalDuration(props.spec)),
+    width,
+    height,
+    fps: props.spec.meta.fps,
+  };
+};
 
 export const RemotionRoot: React.FC = () => (
   <>
@@ -52,6 +89,11 @@ export const RemotionRoot: React.FC = () => (
       id="Transition" component={Transition} fps={FPS} width={W} height={H} durationInFrames={30}
       defaultProps={{ accent: "#1db26b", label: undefined as never, durationSeconds: 1 }}
       calculateMetadata={dur}
+    />
+    <Composition
+      id="Generative" component={Generative} fps={FPS} width={W} height={H} durationInFrames={60}
+      defaultProps={{ spec: MINIMAL_SPEC }}
+      calculateMetadata={generativeMetadata}
     />
   </>
 );
