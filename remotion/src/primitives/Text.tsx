@@ -65,9 +65,25 @@ export const Text: React.FC<PrimitiveProps> = ({ props, frame, fps, height, opac
     animOpacity = p;
     translateY = interpolate(p, [0, 1], [40, 0]);
     scale = interpolate(p, [0, 1], [1.15, 1]);
+  } else if (enter?.easing === "linear") {
+    // Explicit escape hatch: a spec that sets easing:"linear" must render a plain linear fade,
+    // never the spring default below (defaults only fill gaps, they never override an authored
+    // choice) — also covers karaoke/draw/collapse/maskReveal until later tasks implement them.
+    animOpacity = interpolate(local, [0, 12], [0, 1], {
+      extrapolateLeft: "clamp",
+      extrapolateRight: "clamp",
+      easing: Easing.linear,
+    });
   } else {
-    // fade (default) — also covers karaoke/draw/collapse/maskReveal until later tasks implement them
-    animOpacity = interpolate(local, [0, 12], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp", easing: ease });
+    // DEFAULT (no anim authored, or anim falls through to this branch e.g. karaoke/draw/collapse/
+    // maskReveal not yet implemented): spring rise with scale + translateY overshoot, matching
+    // HeroDemo's thesis line — never a linear/bezier fade. Spring/overshoot is the default
+    // entrance everywhere per the binding critique (#5: "everything overshoots, settles, has
+    // spring physics").
+    const p = spring({ frame: local, fps, config: { damping: 15 } });
+    animOpacity = p;
+    translateY = interpolate(p, [0, 1], [22, 0]);
+    scale = interpolate(p, [0, 1], [0.94, 1]);
   }
 
   return (

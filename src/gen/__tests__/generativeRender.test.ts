@@ -7,6 +7,22 @@ import { statSync } from "node:fs";
 const remotionDir = join(process.cwd(), "remotion");
 
 describe("Generative render", () => {
+  it("renders a MINIMAL sparse spec (no background/particles/camera/enter) to a non-blank MP4 — premium-by-construction defaults must kick in", async () => {
+    const v = validateSceneSpec({
+      meta: { aspect: "16:9", fps: 30 },
+      beats: [{ durationInFrames: 60, layers: [{ element: "text", props: { text: "Kaestral" } }] }],
+    });
+    expect(v.ok).toBe(true);
+    if (!v.ok) return;
+    const out = join(remotionDir, ".test-out", "gen-sparse.mp4");
+    const res = await renderRemotion("Generative", { spec: v.spec }, out, remotionDir);
+    expect(res.width).toBe(1920);
+    // A flat-black slideshow frame compresses far smaller than one with an animated grid + glow +
+    // particles backdrop behind spring-entrance text — this is a coarse but effective proxy for
+    // "atmosphere actually composited", not just "some bytes were written".
+    expect(statSync(out).size).toBeGreaterThan(10000);
+  }, 240000);
+
   it("renders a minimal spec to a non-trivial MP4", async () => {
     const v = validateSceneSpec({
       meta: { aspect: "16:9", fps: 30 },

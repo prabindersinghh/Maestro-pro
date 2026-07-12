@@ -1,5 +1,5 @@
 import { AbsoluteFill, Sequence, interpolate, useCurrentFrame } from "remotion";
-import { REGISTRY, Grid, GlowField, Camera, DEFAULT_CAMERA, parallaxOffset, rackBlurFor, applyTransition, TRANSITION_FRAMES } from "../primitives";
+import { REGISTRY, Grid, GlowField, Particles, Camera, DEFAULT_CAMERA, parallaxOffset, rackBlurFor, applyTransition, TRANSITION_FRAMES } from "../primitives";
 import type { CameraSpec, TransitionKind } from "../primitives";
 import { TOKENS, tokenColor } from "../primitives/tokens";
 import type { PrimitiveProps, EnterSpec, StyleSpec } from "../primitives/types";
@@ -22,6 +22,19 @@ import type { PrimitiveProps, EnterSpec, StyleSpec } from "../primitives/types";
 //      dead still.
 //   3. Atmosphere: beats can carry a `particles` layer (registered in the primitive registry) and
 //      the existing Grid/GlowField backgrounds continue to animate every frame.
+//
+// TASK 6.5 UPGRADE — "premium by construction": a sparse agent-authored spec (no `background`, no
+// `enter`) must NEVER regress to a flat-black slideshow. This is now enforced at the INTERPRETER
+// level, not left to the agent remembering to author atmosphere:
+//   4. Baseline ambient atmosphere on EVERY beat: `resolveBackground` defaults a beat with no
+//      `background` to the same animated Grid+GlowField combo HeroDemo uses (never flat black),
+//      and `BeatContent` ALWAYS mounts a low-opacity drifting `Particles` layer behind the
+//      authored layers UNLESS the beat explicitly opts into `background:{kind:"solid"}` — that's
+//      the deliberate clean/minimal escape hatch (see `wantsAmbientParticles`).
+//   5. Spring/overshoot default entrance: `resolveEnter` fills in a spring/overshoot entrance
+//      whenever a layer's `enter` is missing or incomplete (no `anim` / no `easing`) so nothing
+//      defaults to a dead linear cut. An explicit `easing:"linear"` is always honored verbatim —
+//      defaults only fill gaps, they never override an authored choice.
 
 export interface SceneMeta {
   aspect: "16:9" | "9:16" | "1:1";
@@ -96,7 +109,27 @@ function resolveCamera(camera: Beat["camera"] | undefined): CameraSpec {
   return camera as CameraSpec;
 }
 
-/** Renders a beat's `background` field (kind -> Grid/GlowField/solid/parallax). */
+/** Default accent used for synthesized ambient atmosphere when a beat authors no background/accent. */
+const AMBIENT_ACCENT = "green";
+
+/** Opacity for the always-on ambient Particles field behind authored layers (critique #4). */
+const AMBIENT_PARTICLES_OPACITY = 0.3;
+
+/**
+ * True unless the beat explicitly opts into the deliberate clean/minimal escape hatch
+ * (`background:{kind:"solid"}`) — every other beat (including beats with NO background at all)
+ * gets the always-on ambient Particles field per the binding critique's "atmosphere everywhere".
+ */
+function wantsAmbientParticles(background: Beat["background"] | undefined): boolean {
+  return background?.kind !== "solid";
+}
+
+/**
+ * Renders a beat's `background` field (kind -> Grid/GlowField/solid/parallax). A beat with NO
+ * `background` at all is the common sparse-spec case — it must NEVER fall through to flat black
+ * (critique: "slideshow... dead-still frames, zero atmosphere"), so it defaults to the same
+ * animated Grid + breathing GlowField combo HeroDemo composites on every frame.
+ */
 const BeatBackground: React.FC<{ background?: Beat["background"]; frame: number; fps: number; width: number; height: number }> = ({
   background,
   frame,
@@ -104,9 +137,9 @@ const BeatBackground: React.FC<{ background?: Beat["background"]; frame: number;
   width,
   height,
 }) => {
-  if (!background) return null;
+  const accent = background?.accent ?? AMBIENT_ACCENT;
   const basePrimitiveProps: PrimitiveProps = {
-    props: { accent: background.accent },
+    props: { accent },
     frame,
     fps,
     width,
@@ -115,11 +148,69 @@ const BeatBackground: React.FC<{ background?: Beat["background"]; frame: number;
     blur: 0,
     position: { x: 0.5, y: 0.5 },
   };
+
+  if (!background) {
+    // No background authored at all -> baseline ambient atmosphere: drifting grid + breathing
+    // glow together, never a bare AbsoluteFill of flat black.
+    return (
+      <>
+        <GlowField {...basePrimitiveProps} />
+        <Grid {...basePrimitiveProps} />
+      </>
+    );
+  }
+
   if (background.kind === "grid") return <Grid {...basePrimitiveProps} />;
   if (background.kind === "glow" || background.kind === "parallax") return <GlowField {...basePrimitiveProps} />;
-  // "solid" — flat fill in the accent color
-  return <AbsoluteFill style={{ backgroundColor: tokenColor(background.accent) }} />;
+  // "solid" — the deliberate clean/minimal escape hatch: flat fill in the accent color, no grid/glow.
+  return <AbsoluteFill style={{ backgroundColor: tokenColor(accent) }} />;
 };
+
+/**
+ * Always-on ambient Particles layer, mounted BEHIND authored layers (z-order lowest, above only
+ * the background) for every beat that isn't the explicit `background:{kind:"solid"}` escape
+ * hatch. Low opacity so it reads as atmosphere, not competing with authored content.
+ */
+const AmbientParticles: React.FC<{ background?: Beat["background"]; frame: number; fps: number; width: number; height: number }> = ({
+  background,
+  frame,
+  fps,
+  width,
+  height,
+}) => {
+  if (!wantsAmbientParticles(background)) return null;
+  const accent = background?.accent ?? AMBIENT_ACCENT;
+  return (
+    <Particles
+      props={{ accent }}
+      frame={frame}
+      fps={fps}
+      width={width}
+      height={height}
+      opacity={AMBIENT_PARTICLES_OPACITY}
+      blur={0}
+      position={{ x: 0.5, y: 0.5 }}
+    />
+  );
+};
+
+/** Structural default so a missing `position`/`opacity`/`blur` (e.g. a hand-authored raw JSON
+ * spec that skipped `validateSceneSpec`) never crashes a primitive that reads `position.x`. */
+const DEFAULT_POSITION = { x: 0.5, y: 0.5 };
+
+/**
+ * Spring/overshoot is the DEFAULT entrance (critique #5: "everything overshoots, settles, has
+ * spring physics" — never linear). Fills in a spring entrance whenever `enter` is missing
+ * entirely, or present but missing `anim`/`easing`. An explicit `easing:"linear"` (or any other
+ * authored easing) is always preserved verbatim — defaults only fill gaps they never overwrite
+ * an authored choice.
+ */
+function resolveEnter(enter: EnterSpec | undefined): EnterSpec {
+  if (!enter) return { anim: "spring", easing: "spring", from: "below" };
+  const easing = enter.easing ?? "spring";
+  const anim = enter.anim ?? (easing === "linear" ? "fade" : "spring");
+  return { ...enter, anim, easing };
+}
 
 const BeatLayer: React.FC<{
   layer: Layer;
@@ -139,7 +230,13 @@ const BeatLayer: React.FC<{
   // than moving the whole frame as one flat slab.
   const parallaxPx = parallaxOffset(camera, layer.depth, frame, durationInFrames);
   const rackBlurPx = rackBlurFor(camera, layer.depth, frame, durationInFrames, rackInvert);
-  const totalBlur = layer.blur + rackBlurPx;
+  // Defensive defaults: a spec rendered outside `validateSceneSpec` (e.g. a bare hand-authored
+  // JSON prop) may omit opacity/blur/position entirely — never let a missing field crash a
+  // primitive or silently produce NaN styles.
+  const opacity = layer.opacity ?? 1;
+  const blur = layer.blur ?? 0;
+  const position = layer.position ?? DEFAULT_POSITION;
+  const totalBlur = blur + rackBlurPx;
 
   const primitiveProps: PrimitiveProps = {
     props: layer.props,
@@ -147,10 +244,10 @@ const BeatLayer: React.FC<{
     fps,
     width,
     height,
-    opacity: layer.opacity,
+    opacity,
     blur: totalBlur,
-    position: layer.position,
-    enter: layer.enter,
+    position,
+    enter: resolveEnter(layer.enter),
     style: layer.style,
   };
 
@@ -180,7 +277,11 @@ const BeatContent: React.FC<{ beat: Beat; fps: number; width: number; height: nu
 
   return (
     <AbsoluteFill style={{ backgroundColor: TOKENS.black }}>
+      {/* z-order lowest -> highest: flat black fallback, background (grid/glow/solid/parallax),
+          ambient particles, then authored layers on top (under the Camera transform so they read
+          as part of the same shot). Plain DOM order = paint order here, no z-index needed. */}
       <BeatBackground background={beat.background} frame={frame} fps={fps} width={width} height={height} />
+      <AmbientParticles background={beat.background} frame={frame} fps={fps} width={width} height={height} />
       <Camera camera={camera} frame={frame} durationInFrames={beat.durationInFrames}>
         {beat.layers.map((layer, i) => (
           <BeatLayer
