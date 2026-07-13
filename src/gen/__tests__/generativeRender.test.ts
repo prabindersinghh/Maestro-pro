@@ -657,11 +657,17 @@ describe("Generative render", () => {
   // TASK 6b4 — camera.easing (bezier-shaped push-in) + beat.outFade (authorable content out-fade
   // window). Before this task the camera push-in was always LINEAR and the content out-fade was
   // hardcoded to the beat's last 18 frames — an author couldn't shape the push-in's ease, nor
-  // choose an exact custom fade window (e.g. resolving into the next beat's wipe over [70,84]).
-  // This single-beat 84-frame spec authors BOTH: an eased push-in AND an outFade window of
-  // [70, 70+14) = [70,84) — i.e. the LAST 14 frames of the beat, one frame narrower/later than the
-  // old hardcoded [66,84) default, so the two windows are distinguishable.
-  it("renders camera.easing + an authored outFade:[70,84] window — content is full-bright at frame 60 and markedly dimmer at frame 78", async () => {
+  // choose an exact custom fade window anywhere else in the beat.
+  //
+  // This single-beat 84-frame spec authors BOTH: an eased push-in AND an EARLY outFade window of
+  // [20, 20+14) = [20,34) — deliberately DISJOINT from the OLD hardcoded default window of the
+  // beat's last 18 frames, [66,84). That disjointness is the whole point of this test's shape: if
+  // the interpreter ignored `beat.outFade` entirely and fell back to the old hardcoded [66,84)
+  // window, NOTHING would fade anywhere near frame 20-34 (both frame 10 and frame 32 sit well
+  // before frame 66, so they'd read identically full-bright), and the assertions below would FAIL.
+  // Only reading the authored `outFade` field can make content dim inside [20,34) — which is what
+  // makes this a real guard on the new field rather than a coincidental pass under old behavior.
+  it("renders camera.easing + an authored EARLY outFade:[20,34] window — content fades inside that window although it sits nowhere near the old hardcoded last-18-frames default", async () => {
     const v = validateSceneSpec({
       meta: { aspect: "16:9", fps: 30 },
       beats: [
@@ -669,7 +675,7 @@ describe("Generative render", () => {
           durationInFrames: 84,
           background: { kind: "solid", accent: "#0b0a0d" }, // solid black backdrop isolates the text's own luma
           camera: { move: "push-in", amount: 0.04, easing: { curve: [0.22, 0.61, 0.16, 1] } },
-          outFade: { startFrame: 70, durationFrames: 14 },
+          outFade: { startFrame: 20, durationFrames: 14 },
           layers: [
             {
               element: "text",
@@ -687,7 +693,7 @@ describe("Generative render", () => {
     if (v.ok) {
       // Sanity-check the validator actually carried both new fields through before rendering.
       expect(v.spec.beats[0].camera!.easing).toEqual({ curve: [0.22, 0.61, 0.16, 1] });
-      expect(v.spec.beats[0].outFade).toEqual({ startFrame: 70, durationFrames: 14 });
+      expect(v.spec.beats[0].outFade).toEqual({ startFrame: 20, durationFrames: 14 });
     }
     const out = join(remotionDir, ".test-out", "gen-camera-easing-outfade.mp4");
     const res = await renderRemotion("Generative", { spec: v.spec }, out, remotionDir);
@@ -704,15 +710,29 @@ describe("Generative render", () => {
       // out-fade-window proof is skipped in this case.
       return;
     }
-    // Frame 60: well before the authored outFade window starts (70), the default spring entrance
-    // (settles ~frame 28-32, see ASSUMED_ENTRANCE_SETTLE_FRAMES) has long since settled — content
-    // must read full-bright.
-    // Frame 78: 8 frames into the authored [70,84) outFade window (8/14 ≈ 57% through) — content
-    // must read markedly dimmer than frame 60, proving the AUTHORED window (not the old hardcoded
-    // last-18-frames [66,84)) is what's driving the fade.
     const cropAtCenter = { x: 1920 * 0.5 - 1920 * 0.2, y: 1080 * 0.5 - 1080 * 0.12, w: 1920 * 0.4, h: 1080 * 0.24 };
-    const lumaAt60 = await meanLumaOfCrop(out, 60, cropAtCenter);
+    // Frame 10: before the authored outFade window starts (20), and the default spring entrance
+    // (settles ~frame 28-32... but note the entrance and the outFade window overlap here, which is
+    // fine — frame 10 is still early/rising in the entrance, so it's not used as a "full-bright"
+    // baseline. It only needs to be un-faded-by-outFade, which it trivially is since 10 < 20.
+    const lumaAt10 = await meanLumaOfCrop(out, 10, cropAtCenter);
+    // Frame 32: 12 frames into the authored [20,34) outFade window (12/14 ≈ 86% through) — content
+    // must read markedly DIMMER than frame 10. Under the OLD hardcoded [66,84) default, neither
+    // frame 10 nor frame 32 is anywhere near the fade window, so both would read full-bright and
+    // this assertion would FAIL on old (pre-825e515) code — that failure is what proves the
+    // authored window, not the old default, is driving the fade.
+    const lumaAt32 = await meanLumaOfCrop(out, 32, cropAtCenter);
+    expect(lumaAt32).toBeLessThan(lumaAt10 - 5);
+
+    // Frame 78: well past the authored [20,34) window's end. `interpolate` clamps past its output
+    // range by default, so once fully faded the content STAYS faded (it does not un-fade or drift
+    // back up) — frame 78 must read approximately as dim as frame 32, and critically must NOT be
+    // explained by the OLD hardcoded [66,84) default coincidentally kicking in here too: it must
+    // stay near the fully-faded floor, not partially-bright partway through a second fade.
     const lumaAt78 = await meanLumaOfCrop(out, 78, cropAtCenter);
-    expect(lumaAt78).toBeLessThan(lumaAt60 - 5);
+    expect(lumaAt78).toBeLessThan(lumaAt10 - 5);
+    // Loose tolerance (compression/encoding noise near the near-black floor) — the point is "stays
+    // in the same faded ballpark," not bit-exact equality with frame 32.
+    expect(Math.abs(lumaAt78 - lumaAt32)).toBeLessThan(10);
   }, 240000);
 });
