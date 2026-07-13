@@ -105,7 +105,7 @@ export const TOOL_DEFS: ToolDef[] = [
   {
     name: "search_media",
     description:
-      "Search the media library by content: what's on screen (visual, semantic, on-device) and what's said (spoken). Hits are source-second ranges.",
+      "Search the media library by content: what's on screen (visual, semantic, on-device) and what's said (spoken). Hits are source-second ranges. Not available in this Windows build (returns a stub error) — use see_video / get_transcript instead.",
     inputSchema: obj(
       {
         query: str("What to find."),
@@ -202,7 +202,7 @@ export const TOOL_DEFS: ToolDef[] = [
   {
     name: "apply_layout",
     description:
-      "Arrange multiple clips into a named multi-video layout (split screen, PIP, grid) in one undoable action. Computes every transform and crop. Two modes: place new clips (mediaRef) or re-layout existing (clipIds).",
+      "Arrange multiple clips into a named multi-video layout (split screen, PIP, grid) in one undoable action. Computes every transform and crop. Two modes: place new clips (mediaRef) or re-layout existing (clipIds). Slot names by layout: full→[main]; side_by_side→[left,right]; top_bottom→[top,bottom]; pip_bottom_right/pip_bottom_left/pip_top_right/pip_top_left→[main,inset]; grid_2x2→[top_left,top_right,bottom_left,bottom_right]; main_sidebar→[main,sidebar]; three_up→[left,center,right]. Every slot of the chosen layout must be filled.",
     inputSchema: obj(
       {
         layout: enumStr(VIDEO_LAYOUTS, "Which layout template to apply."),
@@ -259,12 +259,12 @@ export const TOOL_DEFS: ToolDef[] = [
   {
     name: "set_keyframes",
     description:
-      "Set animated keyframes on one property of one clip. Replaces the track (empty array clears). Frames are CLIP-RELATIVE (0 = first frame). Each row is [frame, ...values, interp?] where interp ∈ {linear, hold, smooth} (default smooth).",
+      "Set animated keyframes on one property of one clip. Replaces the track (empty array clears). Frames are CLIP-RELATIVE (0 = first frame). Each row is [frame, ...values, interp?] where interp ∈ {linear, hold, smooth} (default smooth). Row shape by property: volume/opacity/rotation → [frame, value, interp?]; position/scale → [frame, a, b, interp?] (position: x,y 0-1; scale: sx,sy); crop → [frame, top, right, bottom, left, interp?] (0-1 each).",
     inputSchema: obj(
       {
         clipId: str("The clip ID."),
         property: enumStr(["volume", "opacity", "rotation", "position", "scale", "crop"], "Which property's track to set."),
-        keyframes: arr({ type: "array" }, "Replacement keyframe rows. Empty array clears the track."),
+        keyframes: arr({ type: "array" }, "Replacement keyframe rows; shape depends on property (see description). Empty array clears the track."),
       },
       ["clipId", "property", "keyframes"],
     ),
@@ -319,7 +319,7 @@ export const TOOL_DEFS: ToolDef[] = [
   {
     name: "sync_audio",
     description:
-      "Align clips to a reference clip by cross-correlating audio and shifting targets. referenceClipId stays put. Returns offsetFrames and confidence per target; refuses weak matches.",
+      "Align clips to a reference clip by cross-correlating audio and shifting targets. referenceClipId stays put. Returns offsetFrames and confidence per target; refuses weak matches. Not available in this Windows build (returns a stub error).",
     inputSchema: obj(
       {
         referenceClipId: str("Clip the others align to. Stays put."),
@@ -408,7 +408,13 @@ export const TOOL_DEFS: ToolDef[] = [
         effects: arr(
           obj(
             {
-              type: str("Effect type id, e.g. stylize.glow."),
+              type: enumStr(
+                [
+                  "detail.clarity", "key.chroma", "blur.gaussian", "blur.sharpen",
+                  "blur.noiseReduction", "blur.motion", "stylize.grain", "stylize.vignette", "stylize.glow",
+                ],
+                "Effect type id. This is the closed set of non-color effects (use apply_color for color.* grading).",
+              ),
               params: obj({}, []),
               enabled: bool("Default true. false bypasses without removing."),
             },
@@ -476,7 +482,7 @@ export const TOOL_DEFS: ToolDef[] = [
   {
     name: "inspect_color",
     description:
-      "Measure color scopes of a timeline clip's graded look (clipId) OR a raw media asset (mediaRef): black/white points, clipping, levels, color tilt, saturation, hueHistogram, plus the rendered frame.",
+      "Measure color scopes of a timeline clip's graded look (clipId) OR a raw media asset (mediaRef): black/white points, clipping, levels, color tilt, saturation, hueHistogram, plus the rendered frame. Not available in this Windows build (returns a stub error) — apply_color/apply_effect still work, this is read-back measurement only.",
     inputSchema: obj({
       clipId: str("Timeline clip to measure — its current GRADED look."),
       mediaRef: str("Media asset id to measure RAW."),
@@ -583,8 +589,8 @@ export const TOOL_DEFS: ToolDef[] = [
       fps: int("Frame rate in frames per second."),
       width: int("Canvas width in pixels. Mutually exclusive with aspectRatio."),
       height: int("Canvas height in pixels. Mutually exclusive with aspectRatio."),
-      aspectRatio: enumStr(["16:9", "9:16", "1:1", "4:3", "2.4:1", "9:14"], "Preset aspect ratio."),
-      quality: enumStr(["720p", "1080p", "2K", "4K"], "Resolution quality preset."),
+      aspectRatio: enumStr(["16:9", "9:16", "1:1", "4:3", "2.4:1", "9:14"], "Preset aspect ratio; sets width/height together (9:14 is a real preset for tall-social crops, not a typo for 9:16)."),
+      quality: enumStr(["720p", "1080p", "2K", "4K"], "Resolution quality preset, independent of aspectRatio."),
     }),
   },
   {
@@ -640,7 +646,7 @@ export const TOOL_DEFS: ToolDef[] = [
   {
     name: "generate_audio",
     description:
-      "Starts an async AI audio generation: TTS, text-to-music, or video-to-music. Returns a placeholder asset ID immediately. Costs real money and is not undoable.",
+      "Starts an async AI audio generation: TTS, text-to-music, or video-to-music. Returns a placeholder asset ID immediately. Costs real money and is not undoable. Not wired in this build (returns a stub error) — use generate_title for animated text or import_media for existing audio.",
     inputSchema: obj({
       prompt: str("Text to speak (TTS) or style/mood (music)."),
       name: str("Display name for the asset."),
@@ -659,7 +665,7 @@ export const TOOL_DEFS: ToolDef[] = [
   {
     name: "upscale_media",
     description:
-      "Upscales an existing video or image asset to higher resolution. Returns a placeholder asset ID immediately. Costs real money and is not undoable.",
+      "Upscales an existing video or image asset to higher resolution. Returns a placeholder asset ID immediately. Costs real money and is not undoable. Not wired in this build (returns a stub error).",
     inputSchema: obj(
       {
         mediaRef: str("ID of the video or image asset to upscale"),
