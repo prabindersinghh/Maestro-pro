@@ -106,6 +106,37 @@
 
 ---
 
-### Task 5: 🚦 RE-RUN THE GATE (controller judges personally)
+### Task 5: 🚦 RE-RUN THE GATE (controller judges personally) — round 2
 
-Not a code task — the controller re-authors the FilmLaunch Beat 1 SceneSpec using the newly added fields (left anchor, wordStagger, mono, anchored eased hairline, eased camera, authored outFade), renders it, extracts matched frames vs the hand original, and judges parity by eye. If Tier-1/Tier-2 gaps remain, expand again. Tier-3 ambient near-misses do NOT block (per Global Constraints). Only when the controller judges the beat reproduced at parity does Task 6b close and the plan returns to Task 7 (the craft skill) of the parent plan.
+Not a code task — the controller re-authors the FilmLaunch Beat 1 SceneSpec using the newly added fields (left anchor, wordStagger, mono, anchored eased hairline, eased camera, authored outFade), renders it, extracts matched frames vs the hand original, and judges parity by eye. If Tier-1/Tier-2 gaps remain, expand again. Tier-3 ambient near-misses do NOT block (per Global Constraints).
+
+**Round-2 result (controller judgment):** Anchoring, hairline direction, mono font, per-word stagger mechanism, eased camera, and outFade window all reproduced at parity — a dramatic improvement. ONE residual Tier-1/2 gap: `resolveEntranceTiming` (`pacing.ts`) silently clamps EVERY layer's authored `enter.delay` to a beat-relative ceiling with no opt-out, collapsing the hand's deliberate 10f-hairline / 16f-subline stagger to the same value — the subline reveal + hairline draw run ~8 frames ahead of the hand. This is worse than a missing field: the surface accepts `delay` then ignores it. → Task 6 (below) adds the opt-out; then re-run the gate again.
+
+---
+
+### Task 6: Honor authored entrance pacing (opt-out of the auto-clamp)
+
+**Files:**
+- Modify: `src/gen/sceneSpec.ts` — `Enter` gains `pacing: "auto"|"manual"` (materialized, default `"auto"`).
+- Modify: `remotion/src/compositions/Generative.tsx` — `resolveEnter` honors `pacing:"manual"` (use authored delay verbatim, skip `resolveEntranceTiming`). Extend the local `EnterSpec` mirror (`remotion/src/primitives/types.ts`) with `pacing`.
+- Test: `src/gen/__tests__/sceneSpec.test.ts` (validator) + `src/gen/__tests__/pacing.test.ts` or a render assertion.
+
+**Rationale (keep the guardrail as default):** `resolveEntranceTiming` is a deliberate anti-smear guardrail (root cause B — a naive spec staggering entrances across a whole beat never settles). It stays the DEFAULT (`pacing:"auto"`). `pacing:"manual"` is the explicit escape hatch for an author who is deliberately pacing entrances that DO settle within the beat — consistent with the thesis "defaults fill gaps, they never override an authored choice." `snapToBeat` is the existing precedent for an opt-in boolean on `Enter`.
+
+**Interfaces:**
+- Consumes: existing `Enter` + `resolveEntranceTiming(delay, beatDuration)`.
+- Produces: `Enter.pacing: "auto"|"manual"` always materialized; when `"manual"`, the authored `delay` reaches the primitive unchanged.
+
+- [ ] **Step 1: Failing validator test** — assert `validateEnter` accepts `{ anim:"wordStagger", delay:16, pacing:"manual" }` and returns `pacing:"manual"`; absent `pacing` → defaults to `"auto"`; `pacing:"bogus"` → fails loud. Add closed enum `ENTRANCE_PACING = ["auto","manual"] as const`.
+- [ ] **Step 2: Run → FAIL.** `npx vitest run src/gen/__tests__/sceneSpec.test.ts`
+- [ ] **Step 3: Implement validator.** Add the enum; extend `ENTER_KEYS` with `"pacing"`; in `validateEnter`, `const pacing = obj.pacing === undefined ? "auto" : checkEnum(obj.pacing, ENTRANCE_PACING, \`${path}.pacing\`)`; add `pacing` to the returned `Enter`; update the `Enter` interface (`pacing: "auto"|"manual"`).
+- [ ] **Step 4: Validator test → PASS.**
+- [ ] **Step 5: Interpreter.** In `resolveEnter` (`Generative.tsx`): `const authoredDelay = base.delay ?? 0; const delay = base.pacing === "manual" ? authoredDelay : resolveEntranceTiming(authoredDelay, beatDurationInFrames); return { ...base, delay };`. Extend `EnterSpec` mirror in `types.ts` with `pacing?: "auto"|"manual"`.
+- [ ] **Step 6: Failing→passing pacing/render test** — a `pacing.test.ts` unit assertion that a manual-pacing resolution keeps `delay:16` (the interpreter path) OR a render test: two `text` layers with `enter.delay` 10 and 34 on an 84f beat, `pacing:"manual"`; assert (ffmpeg) the second is still hidden at a frame where the auto-clamp would have already revealed it — proving the authored delay survives. Also keep a test that DEFAULT (`auto`) still clamps (regression: the existing pacing behavior is unchanged when pacing is absent/auto).
+- [ ] **Step 7: Sync + commit.** `git commit -m "feat(motion): enter.pacing manual opt-out honors authored delay"`
+
+---
+
+### Task 7: 🚦 RE-RUN THE GATE — round 3 (controller judges personally)
+
+Re-author Beat 1 with `pacing:"manual"` on the staggered layers (hairline delay 10, subline delay 16), render, extract matched frames, judge parity by eye. When the controller judges the beat reproduced at Tier-1/2 parity, Task 6b closes and the plan returns to Task 7 (the craft skill) of the parent plan. Tier-3 ambient near-misses do not block.
