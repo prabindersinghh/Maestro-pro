@@ -599,8 +599,22 @@ const BeatSequence: React.FC<{
   // entrance springs) never sees negative time during a lead-in window.
   const clampedLocal = Math.max(0, Math.min(beat.durationInFrames, localFrame));
 
+  // Forensic delta #2: HeroDemo fades each beat's CONTENT out over its final ~18 frames (its
+  // `outFade`) so a beat RESOLVES rather than abruptly stops. We apply the same content-level fade
+  // — but ONLY when this beat's own transitionOut is a hard "cut" (or it's the last beat). For any
+  // animated transition the overlap/wipe already carries the resolve, and double-fading would
+  // dim the crossover. This gives cut-endings and the film's final beat hero's graceful exit.
+  const OUT_FADE_FRAMES = 18;
+  const isLastBeat = !outgoingTransition || outgoingTransition.kind === "cut";
+  const contentFade = isLastBeat
+    ? interpolate(localFrame, [beat.durationInFrames - OUT_FADE_FRAMES, beat.durationInFrames], [1, 0], {
+        extrapolateLeft: "clamp",
+        extrapolateRight: "clamp",
+      })
+    : 1;
+
   return (
-    <AbsoluteFill style={wrapperStyle}>
+    <AbsoluteFill style={{ ...wrapperStyle, opacity: (wrapperStyle.opacity as number | undefined ?? 1) * contentFade }}>
       <BeatContent beat={beat} fps={fps} width={width} height={height} frame={clampedLocal} beatIndex={beatIndex} />
       {overlay && <div style={overlay}>{overlay.content}</div>}
     </AbsoluteFill>

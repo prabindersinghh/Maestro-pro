@@ -8,7 +8,7 @@ import { tokenColor } from "./tokens";
 // at its end. `cut` is the only instant transition (no overlap rendered) — everything else
 // animates across the whole overlap window.
 
-export const TRANSITION_FRAMES = 14; // overlap window, in frames, for every non-cut transition
+export const TRANSITION_FRAMES = 20; // overlap window (forensic delta #3: 14 read abrupt vs hero's ~20f languid resolve)
 
 export type TransitionKind = "wipe" | "dissolve" | "push" | "glitch" | "rgbSplit" | "cut";
 

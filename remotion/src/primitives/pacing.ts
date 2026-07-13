@@ -22,7 +22,7 @@ export const ENTRANCE_COMPLETE_BY_FRACTION = 0.45;
  * out the LATEST delay that still leaves the entrance time to finish inside the hold-settle
  * window, rather than just clamping the delay to the window boundary itself (which would let the
  * spring START at the boundary and visibly finish mid-hold — still "smearing" into the hold). */
-const ASSUMED_ENTRANCE_SETTLE_FRAMES = 20;
+const ASSUMED_ENTRANCE_SETTLE_FRAMES = 30;
 
 /**
  * Resolves the authored entrance `delay` (frames, already range-clamped 0..600 by

@@ -21,38 +21,22 @@
       },
       "layers": [
         {
-          "element": "particles",
-          "props": {
-            "accent": "#16b16a"
-          },
-          "depth": "background",
-          "opacity": 0.5,
-          "position": {
-            "x": 0.5,
-            "y": 0.5
-          }
-        },
-        {
           "element": "text",
           "props": {
             "text": "A kestrel watches."
           },
           "position": {
             "x": 0.34,
-            "y": 0.4
+            "y": 0.42
           },
           "depth": "foreground",
           "style": {
             "role": "display",
-            "size": 0.075
+            "size": 0.07
           },
           "enter": {
-            "anim": "maskReveal",
+            "anim": "spring",
             "easing": "spring"
-          },
-          "mask": {
-            "shape": "wipe",
-            "reveal": "left"
           }
         },
         {
@@ -61,18 +45,18 @@
             "text": "Total precision. Then it strikes."
           },
           "position": {
-            "x": 0.37,
-            "y": 0.52
+            "x": 0.34,
+            "y": 0.54
           },
           "depth": "mid",
           "style": {
             "role": "muted",
-            "size": 0.028
+            "size": 0.026
           },
           "enter": {
             "anim": "wordReveal",
             "easing": "spring",
-            "delay": 16
+            "delay": 14
           }
         },
         {
@@ -82,13 +66,13 @@
           },
           "position": {
             "x": 0.34,
-            "y": 0.46
+            "y": 0.48
           },
           "depth": "mid",
           "enter": {
             "anim": "draw",
             "easing": "ease-out",
-            "delay": 10
+            "delay": 8
           }
         }
       ]
@@ -109,28 +93,42 @@
       },
       "layers": [
         {
-          "element": "textOnPath",
+          "element": "text",
           "props": {
-            "text": "You describe the edit. It makes it.",
-            "path": "arc",
-            "emphasis": [
-              3,
-              7
-            ]
+            "text": "You describe the edit."
           },
           "position": {
             "x": 0.5,
             "y": 0.42
           },
           "depth": "foreground",
-          "motionBlur": true,
           "style": {
             "role": "display",
-            "size": 0.062
+            "size": 0.072
           },
           "enter": {
-            "anim": "kinetic",
+            "anim": "spring",
             "easing": "spring"
+          }
+        },
+        {
+          "element": "text",
+          "props": {
+            "text": "It makes it."
+          },
+          "position": {
+            "x": 0.5,
+            "y": 0.54
+          },
+          "depth": "foreground",
+          "style": {
+            "role": "accent",
+            "size": 0.072
+          },
+          "enter": {
+            "anim": "spring",
+            "easing": "spring",
+            "delay": 12
           }
         },
         {
@@ -141,13 +139,13 @@
           },
           "position": {
             "x": 0.5,
-            "y": 0.6
+            "y": 0.62
           },
           "depth": "mid",
           "enter": {
             "anim": "draw",
             "easing": "ease-out",
-            "delay": 22
+            "delay": 24
           }
         }
       ]

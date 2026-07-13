@@ -11,13 +11,17 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const [, , compId, propsJson, outArg] = process.argv;
+const [, , compId, propsJson, outArg, scaleArg] = process.argv;
 if (!compId || !outArg) {
-  console.error("usage: node render.mjs <CompositionId> '<props-json>' <output.mp4>");
+  console.error("usage: node render.mjs <CompositionId> '<props-json>' <output.mp4> [scale]");
   process.exit(2);
 }
 const inputProps = propsJson ? JSON.parse(propsJson) : {};
 const outputLocation = path.resolve(outArg);
+// Optional resolution scale: 1 = native 1080p (fast, the user-facing default), 2 = 4K/UHD
+// (2x each axis — slower, offered as an option). Clamped to [1, 2]; compositions are authored at
+// 1080p and scaled up at render time so no layout/type math changes with resolution.
+const renderScale = Math.max(1, Math.min(2, Number(scaleArg) || 1));
 
 // Media/image/screenMock layers (Task 8) carry `props.src` as an absolute filesystem path
 // (pre-validated against the project's media allowlist by validateSceneSpec). Neither Remotion's
@@ -86,12 +90,14 @@ await renderMedia({
   codec: "h264",
   outputLocation,
   inputProps,
+  scale: renderScale, // 1 = 1080p (default), 2 = 4K — see renderScale above
   // headless Chromium flags that are robust across machines (incl. no-GPU Windows CI/VMs)
   chromiumOptions,
 });
 
 console.log(JSON.stringify({
   outputLocation,
+  scale: renderScale,
   durationInFrames: composition.durationInFrames,
   width: composition.width,
   height: composition.height,

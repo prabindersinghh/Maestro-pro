@@ -85,7 +85,10 @@ export const TextOnPath: React.FC<PrimitiveProps> = ({ props, frame, fps, width,
         const kineticScale = interpolate(wp, [0, 1], [isEmphasis ? 1.6 : 1.3, isEmphasis ? 1.08 : 1]);
         const landRotate = interpolate(wp, [0, 1], [rotate * 2.4, rotate]);
         const wordOpacity = wp;
-        const color = isEmphasis ? (i % 2 === 0 ? TOKENS.greenHi : TOKENS.gold) : (props.color ? tokenColor(String(props.color)) : TOKENS.ink);
+        // Emphasis words are always bright green (forensic delta #7 — alternating in gold read
+        // muddy/olive on the dark ground; hero uses a single bright green accent, never a dim gold
+        // on display text). Gold stays a hairline/structural accent, not a type color.
+        const color = isEmphasis ? TOKENS.greenHi : (props.color ? tokenColor(String(props.color)) : TOKENS.ink);
 
         return (
           <div

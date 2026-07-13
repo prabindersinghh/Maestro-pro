@@ -36,9 +36,12 @@ export const Text: React.FC<PrimitiveProps> = ({ props, frame, fps, width, heigh
     const p = spring({ frame: local, fps, config: { damping: 15 } });
     animOpacity = p;
     const from = enter?.from ?? "below";
+    // Pure directional slide, no scale (forensic delta #1 — HeroDemo display text never scale-pops).
+    // `scale` from-mode is the one deliberate exception: it exists precisely for an author who wants
+    // a scale entrance, and it's a gentle 0.92 (was 0.85 — a big scale reads cheap).
     if (from === "below") translateY = interpolate(p, [0, 1], [22, 0]);
     else if (from === "left") translateX = interpolate(p, [0, 1], [-30, 0]);
-    else if (from === "scale") scale = interpolate(p, [0, 1], [0.85, 1]);
+    else if (from === "scale") scale = interpolate(p, [0, 1], [0.92, 1]);
   } else if (anim === "typewriter") {
     const typed = Math.floor(
       interpolate(local, [0, Math.max(10, text.length * 1.6)], [0, text.length], {
@@ -75,15 +78,13 @@ export const Text: React.FC<PrimitiveProps> = ({ props, frame, fps, width, heigh
       easing: Easing.linear,
     });
   } else {
-    // DEFAULT (no anim authored, or anim falls through to this branch e.g. karaoke/draw/collapse/
-    // maskReveal not yet implemented): spring rise with scale + translateY overshoot, matching
-    // HeroDemo's thesis line — never a linear/bezier fade. Spring/overshoot is the default
-    // entrance everywhere per the binding critique (#5: "everything overshoots, settles, has
-    // spring physics").
+    // DEFAULT (no anim authored, or anim falls through e.g. karaoke/draw/collapse/maskReveal):
+    // EXACT HeroDemo thesis-line entrance — spring(damping 15), opacity = spring, and a pure
+    // translateY 22->0 rise. NO scale: HeroDemo's display text does not scale-pop, and a scale on
+    // display type is the single biggest "template" tell (forensic delta #1). Match the bar exactly.
     const p = spring({ frame: local, fps, config: { damping: 15 } });
     animOpacity = p;
     translateY = interpolate(p, [0, 1], [22, 0]);
-    scale = interpolate(p, [0, 1], [0.94, 1]);
   }
 
   return (
