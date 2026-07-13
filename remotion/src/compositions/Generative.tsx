@@ -239,8 +239,28 @@ const BeatBackground: React.FC<{ background?: Beat["background"]; frame: number;
     );
   }
 
-  if (background.kind === "grid") return <Grid {...basePrimitiveProps} />;
-  if (background.kind === "glow" || background.kind === "parallax") return <GlowField {...basePrimitiveProps} />;
+  // HeroDemo (the quality bar) composites BOTH the breathing glow AND the drifting grid on EVERY
+  // beat — the grid gives the frame its consistent premium texture, the glow its depth. So `grid`,
+  // `glow`, and `parallax` all render the same grid+glow pair (the `kind` only nudges emphasis:
+  // "grid" leads with the grid on top for a more technical read, "glow"/"parallax" lead with the
+  // glow). This is a root-cause fix for "grid too faint / near-black on glow beats" — a beat should
+  // never lose hero's grid texture just because its author picked kind:"glow".
+  if (background.kind === "grid") {
+    return (
+      <>
+        <GlowField {...basePrimitiveProps} />
+        <Grid {...basePrimitiveProps} />
+      </>
+    );
+  }
+  if (background.kind === "glow" || background.kind === "parallax") {
+    return (
+      <>
+        <Grid {...basePrimitiveProps} />
+        <GlowField {...basePrimitiveProps} />
+      </>
+    );
+  }
   // "solid" — the deliberate clean/minimal escape hatch: flat fill in the accent color, no grid/glow.
   return <AbsoluteFill style={{ backgroundColor: tokenColor(accent) }} />;
 };

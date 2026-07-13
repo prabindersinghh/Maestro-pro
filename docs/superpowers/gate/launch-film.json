@@ -173,13 +173,13 @@
             "text": "It edits on a real timeline."
           },
           "position": {
-            "x": 0.3,
-            "y": 0.3
+            "x": 0.28,
+            "y": 0.28
           },
           "depth": "mid",
           "style": {
             "role": "display",
-            "size": 0.045
+            "size": 0.05
           },
           "enter": {
             "anim": "spring",
@@ -187,14 +187,30 @@
           }
         },
         {
+          "element": "hairline",
+          "props": {
+            "color": "gold"
+          },
+          "position": {
+            "x": 0.28,
+            "y": 0.36
+          },
+          "depth": "mid",
+          "enter": {
+            "anim": "draw",
+            "easing": "ease-out",
+            "delay": 8
+          }
+        },
+        {
           "element": "timeline",
           "props": {
             "tracks": 3,
-            "width": 0.52
+            "width": 0.62
           },
           "position": {
-            "x": 0.6,
-            "y": 0.54
+            "x": 0.5,
+            "y": 0.56
           },
           "depth": "foreground",
           "style": {
@@ -219,7 +235,7 @@
           },
           "position": {
             "x": 0.5,
-            "y": 0.84
+            "y": 0.82
           },
           "depth": "foreground",
           "style": {
@@ -235,7 +251,7 @@
       ]
     },
     {
-      "durationInFrames": 36,
+      "durationInFrames": 54,
       "camera": {
         "move": "push-in",
         "amount": 0.16
