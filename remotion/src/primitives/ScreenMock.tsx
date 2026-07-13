@@ -12,7 +12,7 @@ import { TOKENS } from "./tokens";
 const CHROME_BG = "rgba(18,17,22,0.92)";
 const BAR_BG = "rgba(255,255,255,0.05)";
 
-export const ScreenMock: React.FC<PrimitiveProps> = ({ props, frame, fps, width, opacity, blur, position, enter }) => {
+export const ScreenMock: React.FC<PrimitiveProps> = ({ props, frame, fps, width, height, opacity, blur, position, enter }) => {
   const src = typeof props.src === "string" ? props.src : "";
   const url = typeof props.url === "string" ? props.url : "";
   const boxW = typeof props.width === "number" ? props.width * width : width * 0.56;
@@ -34,6 +34,7 @@ export const ScreenMock: React.FC<PrimitiveProps> = ({ props, frame, fps, width,
         left: `${position.x * 100}%`,
         top: `${position.y * 100}%`,
         width: boxW,
+        maxHeight: height * 0.78, // never overflow the frame, whatever the screenshot's aspect
         opacity: opacity * animOpacity,
         filter: blur > 0 ? `blur(${blur}px)` : undefined,
         transform: `translate(-50%, -50%) translateY(${translateY}px) scale(${scale})`,

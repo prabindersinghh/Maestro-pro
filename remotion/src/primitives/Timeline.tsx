@@ -44,7 +44,9 @@ export const Timeline: React.FC<PrimitiveProps> = ({ props, frame, width, height
   const groupIn = interpolate(local, [0, 14], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp", easing: ease });
   const playhead = interpolate(local, [6, 60], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp", easing: ease });
 
-  const boxW = width * 0.66;
+  // Honor an authored props.width (fraction of frame width, clamped 0.2..1); default 0.66.
+  const widthFrac = typeof props.width === "number" ? Math.max(0.2, Math.min(1, props.width)) : 0.66;
+  const boxW = width * widthFrac;
   const trackH = height * 0.045;
 
   return (

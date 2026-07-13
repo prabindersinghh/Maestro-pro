@@ -1,0 +1,380 @@
+{
+  "meta": {
+    "aspect": "16:9",
+    "fps": 30,
+    "brand": "kaestral"
+  },
+  "beats": [
+    {
+      "durationInFrames": 72,
+      "camera": {
+        "move": "parallax",
+        "amount": 0.1
+      },
+      "background": {
+        "kind": "glow",
+        "accent": "#16b16a"
+      },
+      "transitionOut": {
+        "kind": "wipe",
+        "accent": "#16b16a"
+      },
+      "layers": [
+        {
+          "element": "particles",
+          "props": {
+            "accent": "#16b16a"
+          },
+          "depth": "background",
+          "opacity": 0.5,
+          "position": {
+            "x": 0.5,
+            "y": 0.5
+          }
+        },
+        {
+          "element": "text",
+          "props": {
+            "text": "A kestrel watches."
+          },
+          "position": {
+            "x": 0.34,
+            "y": 0.4
+          },
+          "depth": "foreground",
+          "style": {
+            "role": "display",
+            "size": 0.075
+          },
+          "enter": {
+            "anim": "maskReveal",
+            "easing": "spring"
+          },
+          "mask": {
+            "shape": "wipe",
+            "reveal": "left"
+          }
+        },
+        {
+          "element": "text",
+          "props": {
+            "text": "Total precision. Then it strikes."
+          },
+          "position": {
+            "x": 0.37,
+            "y": 0.52
+          },
+          "depth": "mid",
+          "style": {
+            "role": "muted",
+            "size": 0.028
+          },
+          "enter": {
+            "anim": "wordReveal",
+            "easing": "spring",
+            "delay": 16
+          }
+        },
+        {
+          "element": "hairline",
+          "props": {
+            "color": "gold"
+          },
+          "position": {
+            "x": 0.34,
+            "y": 0.46
+          },
+          "depth": "mid",
+          "enter": {
+            "anim": "draw",
+            "easing": "ease-out",
+            "delay": 10
+          }
+        }
+      ]
+    },
+    {
+      "durationInFrames": 84,
+      "camera": {
+        "move": "pan-right",
+        "amount": 0.08
+      },
+      "background": {
+        "kind": "grid",
+        "accent": "#16b16a"
+      },
+      "transitionOut": {
+        "kind": "push",
+        "accent": "#16b16a"
+      },
+      "layers": [
+        {
+          "element": "textOnPath",
+          "props": {
+            "text": "You describe the edit. It makes it.",
+            "path": "arc",
+            "emphasis": [
+              3,
+              7
+            ]
+          },
+          "position": {
+            "x": 0.5,
+            "y": 0.42
+          },
+          "depth": "foreground",
+          "motionBlur": true,
+          "style": {
+            "role": "display",
+            "size": 0.062
+          },
+          "enter": {
+            "anim": "kinetic",
+            "easing": "spring"
+          }
+        },
+        {
+          "element": "shape",
+          "props": {
+            "shape": "line",
+            "color": "#16b16a"
+          },
+          "position": {
+            "x": 0.5,
+            "y": 0.6
+          },
+          "depth": "mid",
+          "enter": {
+            "anim": "draw",
+            "easing": "ease-out",
+            "delay": 22
+          }
+        }
+      ]
+    },
+    {
+      "durationInFrames": 96,
+      "camera": {
+        "move": "rack",
+        "amount": 0.14
+      },
+      "background": {
+        "kind": "glow",
+        "accent": "#16b16a"
+      },
+      "transitionOut": {
+        "kind": "glitch",
+        "accent": "#16b16a"
+      },
+      "layers": [
+        {
+          "element": "text",
+          "props": {
+            "text": "It edits on a real timeline."
+          },
+          "position": {
+            "x": 0.3,
+            "y": 0.3
+          },
+          "depth": "mid",
+          "style": {
+            "role": "display",
+            "size": 0.045
+          },
+          "enter": {
+            "anim": "spring",
+            "easing": "spring"
+          }
+        },
+        {
+          "element": "timeline",
+          "props": {
+            "tracks": 3,
+            "width": 0.52
+          },
+          "position": {
+            "x": 0.6,
+            "y": 0.54
+          },
+          "depth": "foreground",
+          "style": {
+            "role": "display",
+            "size": 0.3
+          },
+          "enter": {
+            "anim": "spring",
+            "easing": "spring",
+            "delay": 8
+          }
+        },
+        {
+          "element": "captionKaraoke",
+          "props": {
+            "words": [
+              "cut",
+              "caption",
+              "punch",
+              "grade"
+            ]
+          },
+          "position": {
+            "x": 0.5,
+            "y": 0.84
+          },
+          "depth": "foreground",
+          "style": {
+            "role": "display",
+            "size": 0.026
+          },
+          "enter": {
+            "anim": "spring",
+            "easing": "spring",
+            "delay": 20
+          }
+        }
+      ]
+    },
+    {
+      "durationInFrames": 36,
+      "camera": {
+        "move": "push-in",
+        "amount": 0.16
+      },
+      "background": {
+        "kind": "solid",
+        "accent": "#0b0a0d"
+      },
+      "transitionOut": {
+        "kind": "rgbSplit",
+        "accent": "#16b16a"
+      },
+      "layers": [
+        {
+          "element": "countdown",
+          "props": {},
+          "position": {
+            "x": 0.5,
+            "y": 0.5
+          },
+          "depth": "foreground",
+          "motionBlur": true,
+          "enter": {
+            "anim": "spring",
+            "easing": "spring"
+          },
+          "exit": {
+            "anim": "glitch",
+            "at": 30
+          }
+        }
+      ]
+    },
+    {
+      "durationInFrames": 96,
+      "camera": {
+        "move": "push-in",
+        "amount": 0.07
+      },
+      "background": {
+        "kind": "glow",
+        "accent": "#16b16a"
+      },
+      "layers": [
+        {
+          "element": "particles",
+          "props": {
+            "accent": "#16b16a"
+          },
+          "depth": "background",
+          "opacity": 0.4,
+          "position": {
+            "x": 0.5,
+            "y": 0.5
+          }
+        },
+        {
+          "element": "logo",
+          "props": {
+            "scale": 0.85
+          },
+          "position": {
+            "x": 0.41,
+            "y": 0.47
+          },
+          "depth": "mid",
+          "enter": {
+            "anim": "spring",
+            "easing": "spring"
+          },
+          "lightingSweep": {
+            "on": true,
+            "angle": 24,
+            "speed": 1.2
+          }
+        },
+        {
+          "element": "text",
+          "props": {
+            "text": "Kaestral"
+          },
+          "position": {
+            "x": 0.58,
+            "y": 0.47
+          },
+          "depth": "foreground",
+          "style": {
+            "role": "display",
+            "size": 0.085
+          },
+          "enter": {
+            "anim": "spring",
+            "easing": "spring",
+            "delay": 10,
+            "from": "left"
+          },
+          "lightingSweep": {
+            "on": true,
+            "angle": 24,
+            "speed": 1.2
+          }
+        },
+        {
+          "element": "text",
+          "props": {
+            "text": "The AI-operated video editor for Windows"
+          },
+          "position": {
+            "x": 0.5,
+            "y": 0.62
+          },
+          "depth": "mid",
+          "style": {
+            "role": "muted",
+            "size": 0.024
+          },
+          "enter": {
+            "anim": "wordReveal",
+            "easing": "spring",
+            "delay": 24
+          }
+        },
+        {
+          "element": "hairline",
+          "props": {
+            "color": "gold"
+          },
+          "position": {
+            "x": 0.5,
+            "y": 0.56
+          },
+          "depth": "mid",
+          "enter": {
+            "anim": "draw",
+            "easing": "ease-out",
+            "delay": 18
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,376 @@
+{
+  "meta": {
+    "aspect": "9:16",
+    "fps": 30,
+    "brand": "kaestral"
+  },
+  "beats": [
+    {
+      "durationInFrames": 60,
+      "camera": {
+        "move": "push-in",
+        "amount": 0.09
+      },
+      "background": {
+        "kind": "glow",
+        "accent": "#16b16a"
+      },
+      "transitionOut": {
+        "kind": "wipe",
+        "accent": "#16b16a"
+      },
+      "layers": [
+        {
+          "element": "counter",
+          "props": {
+            "value": 20,
+            "suffix": " min",
+            "label": "of raw footage"
+          },
+          "position": {
+            "x": 0.5,
+            "y": 0.42
+          },
+          "depth": "foreground",
+          "style": {
+            "role": "display",
+            "size": 0.09
+          },
+          "enter": {
+            "anim": "spring",
+            "easing": "spring"
+          }
+        },
+        {
+          "element": "text",
+          "props": {
+            "text": "Nobody watches that."
+          },
+          "position": {
+            "x": 0.5,
+            "y": 0.58
+          },
+          "depth": "mid",
+          "style": {
+            "role": "muted",
+            "size": 0.034
+          },
+          "enter": {
+            "anim": "wordReveal",
+            "easing": "spring",
+            "delay": 18
+          }
+        }
+      ]
+    },
+    {
+      "durationInFrames": 84,
+      "camera": {
+        "move": "rack",
+        "amount": 0.12
+      },
+      "background": {
+        "kind": "grid",
+        "accent": "#16b16a"
+      },
+      "transitionOut": {
+        "kind": "push",
+        "accent": "#16b16a"
+      },
+      "layers": [
+        {
+          "element": "text",
+          "props": {
+            "text": "Kaestral cuts the filler."
+          },
+          "position": {
+            "x": 0.5,
+            "y": 0.26
+          },
+          "depth": "foreground",
+          "style": {
+            "role": "display",
+            "size": 0.052
+          },
+          "enter": {
+            "anim": "spring",
+            "easing": "spring"
+          }
+        },
+        {
+          "element": "waveform",
+          "props": {
+            "bars": 22,
+            "fillerIdx": [
+              2,
+              3,
+              8,
+              12,
+              13,
+              18
+            ],
+            "collapse": true
+          },
+          "position": {
+            "x": 0.5,
+            "y": 0.5
+          },
+          "depth": "mid",
+          "style": {
+            "role": "display",
+            "size": 0.16
+          },
+          "enter": {
+            "anim": "spring",
+            "easing": "spring",
+            "delay": 10
+          }
+        },
+        {
+          "element": "counter",
+          "props": {
+            "value": 20,
+            "prefix": "\u2192 ",
+            "suffix": " sec",
+            "label": "publish-ready"
+          },
+          "position": {
+            "x": 0.5,
+            "y": 0.72
+          },
+          "depth": "foreground",
+          "style": {
+            "role": "display",
+            "size": 0.06
+          },
+          "enter": {
+            "anim": "spring",
+            "easing": "spring",
+            "delay": 34
+          }
+        }
+      ]
+    },
+    {
+      "durationInFrames": 84,
+      "camera": {
+        "move": "pan-right",
+        "amount": 0.07
+      },
+      "background": {
+        "kind": "glow",
+        "accent": "#16b16a"
+      },
+      "transitionOut": {
+        "kind": "dissolve",
+        "accent": "#16b16a"
+      },
+      "layers": [
+        {
+          "element": "text",
+          "props": {
+            "text": "Shorts win the feed."
+          },
+          "position": {
+            "x": 0.5,
+            "y": 0.22
+          },
+          "depth": "foreground",
+          "style": {
+            "role": "display",
+            "size": 0.05
+          },
+          "enter": {
+            "anim": "spring",
+            "easing": "spring"
+          }
+        },
+        {
+          "element": "barChart",
+          "props": {
+            "bars": [
+              {
+                "label": "20 min",
+                "value": 8
+              },
+              {
+                "label": "3 min",
+                "value": 34
+              },
+              {
+                "label": "20 sec",
+                "value": 86
+              }
+            ]
+          },
+          "position": {
+            "x": 0.5,
+            "y": 0.56
+          },
+          "depth": "mid",
+          "style": {
+            "role": "display",
+            "size": 0.26
+          },
+          "enter": {
+            "anim": "spring",
+            "easing": "spring",
+            "delay": 8
+          }
+        }
+      ]
+    },
+    {
+      "durationInFrames": 72,
+      "camera": {
+        "move": "parallax",
+        "amount": 0.09
+      },
+      "background": {
+        "kind": "grid",
+        "accent": "#16b16a"
+      },
+      "transitionOut": {
+        "kind": "rgbSplit",
+        "accent": "#16b16a"
+      },
+      "layers": [
+        {
+          "element": "text",
+          "props": {
+            "text": "Watch time, after Kaestral"
+          },
+          "position": {
+            "x": 0.5,
+            "y": 0.24
+          },
+          "depth": "foreground",
+          "style": {
+            "role": "muted",
+            "size": 0.03
+          },
+          "enter": {
+            "anim": "spring",
+            "easing": "spring"
+          }
+        },
+        {
+          "element": "areaChart",
+          "props": {
+            "points": [
+              12,
+              18,
+              16,
+              28,
+              42,
+              38,
+              64,
+              88
+            ]
+          },
+          "position": {
+            "x": 0.5,
+            "y": 0.5
+          },
+          "depth": "mid",
+          "style": {
+            "role": "display",
+            "size": 0.24
+          },
+          "enter": {
+            "anim": "spring",
+            "easing": "spring",
+            "delay": 10
+          }
+        },
+        {
+          "element": "counter",
+          "props": {
+            "value": 340,
+            "suffix": "%",
+            "label": "more minutes watched"
+          },
+          "position": {
+            "x": 0.5,
+            "y": 0.74
+          },
+          "depth": "foreground",
+          "style": {
+            "role": "display",
+            "size": 0.055
+          },
+          "enter": {
+            "anim": "spring",
+            "easing": "spring",
+            "delay": 28
+          }
+        }
+      ]
+    },
+    {
+      "durationInFrames": 72,
+      "camera": {
+        "move": "push-in",
+        "amount": 0.08
+      },
+      "background": {
+        "kind": "glow",
+        "accent": "#16b16a"
+      },
+      "layers": [
+        {
+          "element": "particles",
+          "props": {
+            "accent": "#16b16a"
+          },
+          "depth": "background",
+          "opacity": 0.4,
+          "position": {
+            "x": 0.5,
+            "y": 0.5
+          }
+        },
+        {
+          "element": "logo",
+          "props": {
+            "scale": 0.6
+          },
+          "position": {
+            "x": 0.5,
+            "y": 0.4
+          },
+          "depth": "mid",
+          "enter": {
+            "anim": "spring",
+            "easing": "spring"
+          },
+          "lightingSweep": {
+            "on": true,
+            "angle": 22,
+            "speed": 1.2
+          }
+        },
+        {
+          "element": "text",
+          "props": {
+            "text": "Publish-ready in one prompt."
+          },
+          "position": {
+            "x": 0.5,
+            "y": 0.56
+          },
+          "depth": "foreground",
+          "style": {
+            "role": "display",
+            "size": 0.045
+          },
+          "enter": {
+            "anim": "wordReveal",
+            "easing": "spring",
+            "delay": 14
+          }
+        }
+      ]
+    }
+  ]
+}

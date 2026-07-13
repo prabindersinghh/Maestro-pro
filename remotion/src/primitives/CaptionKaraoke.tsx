@@ -10,8 +10,11 @@ import { TOKENS } from "./tokens";
 // pin, the highlight also sweeps across words over time so long caption lines still read as
 // "karaoke" rather than a single static highlight.
 
-export const CaptionKaraoke: React.FC<PrimitiveProps> = ({ props, frame, fps, width, opacity, blur, position, enter }) => {
+export const CaptionKaraoke: React.FC<PrimitiveProps> = ({ props, frame, fps, width, height, opacity, blur, position, enter, style }) => {
   const words = Array.isArray(props.words) ? (props.words as unknown[]).map(String) : ["this", "is", "the", "hook"];
+  // Honor an authored style.size (fraction of the frame's short edge, like Text). The previous
+  // hardcoded width*0.06 ignored the spec author and produced enormous chips at 1920px wide.
+  const fontSize = Math.round((style?.size ?? 0.045) * Math.min(width, height));
   const delay = enter?.delay ?? 0;
   const local = frame - delay;
 
@@ -47,7 +50,7 @@ export const CaptionKaraoke: React.FC<PrimitiveProps> = ({ props, frame, fps, wi
                 transform: `translateY(${interpolate(wp, [0, 1], [16, 0])}px)`,
                 fontWeight: 800,
                 fontFamily: TOKENS.fontSans,
-                fontSize: Math.round(width * 0.06),
+                fontSize,
                 color: hot ? TOKENS.greenHi : TOKENS.ink,
                 background: hot ? "rgba(31,206,126,0.14)" : "transparent",
                 padding: "2px 14px",

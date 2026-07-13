@@ -1,0 +1,420 @@
+{
+  "meta": {
+    "aspect": "16:9",
+    "fps": 30,
+    "brand": "kaestral"
+  },
+  "beats": [
+    {
+      "durationInFrames": 60,
+      "camera": {
+        "move": "parallax",
+        "amount": 0.09
+      },
+      "background": {
+        "kind": "glow",
+        "accent": "#16b16a"
+      },
+      "transitionOut": {
+        "kind": "dissolve",
+        "accent": "#16b16a"
+      },
+      "layers": [
+        {
+          "element": "text",
+          "props": {
+            "text": "Ship product demos"
+          },
+          "position": {
+            "x": 0.33,
+            "y": 0.4
+          },
+          "depth": "foreground",
+          "style": {
+            "role": "display",
+            "size": 0.065
+          },
+          "enter": {
+            "anim": "spring",
+            "easing": "spring"
+          }
+        },
+        {
+          "element": "text",
+          "props": {
+            "text": "without an editor."
+          },
+          "position": {
+            "x": 0.33,
+            "y": 0.52
+          },
+          "depth": "foreground",
+          "style": {
+            "role": "accent",
+            "size": 0.065
+          },
+          "enter": {
+            "anim": "spring",
+            "easing": "spring",
+            "delay": 10
+          }
+        },
+        {
+          "element": "hairline",
+          "props": {
+            "color": "gold"
+          },
+          "position": {
+            "x": 0.33,
+            "y": 0.6
+          },
+          "depth": "mid",
+          "enter": {
+            "anim": "draw",
+            "easing": "ease-out",
+            "delay": 20
+          }
+        }
+      ]
+    },
+    {
+      "durationInFrames": 108,
+      "camera": {
+        "move": "push-in",
+        "amount": 0.06
+      },
+      "background": {
+        "kind": "grid",
+        "accent": "#16b16a"
+      },
+      "transitionOut": {
+        "kind": "push",
+        "accent": "#16b16a"
+      },
+      "layers": [
+        {
+          "element": "screenMock",
+          "props": {
+            "src": "C:/Users/prabi/Downloads/palmier-pro-main (2)/palmier-win/public/sample-image.png",
+            "url": "kaestral.dev",
+            "width": 0.4
+          },
+          "position": {
+            "x": 0.66,
+            "y": 0.52
+          },
+          "depth": "mid",
+          "style": {
+            "role": "display",
+            "size": 0.34
+          },
+          "enter": {
+            "anim": "maskReveal",
+            "easing": "spring"
+          },
+          "mask": {
+            "shape": "rect",
+            "reveal": "up"
+          },
+          "kenBurns": {
+            "move": "drift",
+            "amount": 0.05
+          }
+        },
+        {
+          "element": "text",
+          "props": {
+            "text": "Point at your product."
+          },
+          "position": {
+            "x": 0.22,
+            "y": 0.3
+          },
+          "depth": "foreground",
+          "style": {
+            "role": "display",
+            "size": 0.042
+          },
+          "enter": {
+            "anim": "spring",
+            "easing": "spring",
+            "delay": 8
+          }
+        },
+        {
+          "element": "arrow",
+          "props": {
+            "from": {
+              "x": 0.34,
+              "y": 0.38
+            },
+            "to": {
+              "x": 0.5,
+              "y": 0.46
+            }
+          },
+          "depth": "foreground",
+          "position": {
+            "x": 0.5,
+            "y": 0.5
+          },
+          "enter": {
+            "anim": "draw",
+            "easing": "ease-out",
+            "delay": 22
+          }
+        },
+        {
+          "element": "highlightBox",
+          "props": {
+            "rect": {
+              "x": 0.56,
+              "y": 0.36,
+              "w": 0.2,
+              "h": 0.3
+            }
+          },
+          "depth": "foreground",
+          "position": {
+            "x": 0.5,
+            "y": 0.5
+          },
+          "enter": {
+            "anim": "draw",
+            "easing": "ease-out",
+            "delay": 34
+          }
+        }
+      ]
+    },
+    {
+      "durationInFrames": 84,
+      "camera": {
+        "move": "rack",
+        "amount": 0.12
+      },
+      "background": {
+        "kind": "glow",
+        "accent": "#16b16a"
+      },
+      "transitionOut": {
+        "kind": "wipe",
+        "accent": "#16b16a"
+      },
+      "layers": [
+        {
+          "element": "text",
+          "props": {
+            "text": "It cuts the boring parts itself."
+          },
+          "position": {
+            "x": 0.5,
+            "y": 0.24
+          },
+          "depth": "foreground",
+          "style": {
+            "role": "display",
+            "size": 0.04
+          },
+          "enter": {
+            "anim": "spring",
+            "easing": "spring"
+          }
+        },
+        {
+          "element": "waveform",
+          "props": {
+            "bars": 26,
+            "fillerIdx": [
+              3,
+              4,
+              9,
+              14,
+              15,
+              20
+            ],
+            "collapse": true
+          },
+          "position": {
+            "x": 0.5,
+            "y": 0.52
+          },
+          "depth": "foreground",
+          "style": {
+            "role": "display",
+            "size": 0.2
+          },
+          "enter": {
+            "anim": "spring",
+            "easing": "spring",
+            "delay": 8
+          }
+        },
+        {
+          "element": "captionKaraoke",
+          "props": {
+            "words": [
+              "filler",
+              "cut",
+              "hook",
+              "found"
+            ]
+          },
+          "position": {
+            "x": 0.5,
+            "y": 0.78
+          },
+          "depth": "foreground",
+          "style": {
+            "role": "display",
+            "size": 0.026
+          },
+          "enter": {
+            "anim": "spring",
+            "easing": "spring",
+            "delay": 26
+          }
+        }
+      ]
+    },
+    {
+      "durationInFrames": 84,
+      "camera": {
+        "move": "pan-left",
+        "amount": 0.07
+      },
+      "background": {
+        "kind": "grid",
+        "accent": "#16b16a"
+      },
+      "transitionOut": {
+        "kind": "dissolve",
+        "accent": "#16b16a"
+      },
+      "layers": [
+        {
+          "element": "splitLayout",
+          "props": {
+            "direction": "row",
+            "panels": [
+              {
+                "element": "text",
+                "props": {
+                  "text": "Type the edit you want."
+                },
+                "style": {
+                  "role": "display",
+                  "size": 0.038
+                }
+              },
+              {
+                "element": "timeline",
+                "props": {
+                  "tracks": 3
+                },
+                "style": {
+                  "role": "display",
+                  "size": 0.24
+                }
+              }
+            ]
+          },
+          "position": {
+            "x": 0.5,
+            "y": 0.5
+          },
+          "depth": "mid",
+          "enter": {
+            "anim": "spring",
+            "easing": "spring"
+          }
+        }
+      ]
+    },
+    {
+      "durationInFrames": 84,
+      "camera": {
+        "move": "push-in",
+        "amount": 0.08
+      },
+      "background": {
+        "kind": "glow",
+        "accent": "#16b16a"
+      },
+      "layers": [
+        {
+          "element": "particles",
+          "props": {
+            "accent": "#16b16a"
+          },
+          "depth": "background",
+          "opacity": 0.4,
+          "position": {
+            "x": 0.5,
+            "y": 0.5
+          }
+        },
+        {
+          "element": "logo",
+          "props": {
+            "scale": 0.7
+          },
+          "position": {
+            "x": 0.5,
+            "y": 0.38
+          },
+          "depth": "mid",
+          "enter": {
+            "anim": "spring",
+            "easing": "spring"
+          },
+          "lightingSweep": {
+            "on": true,
+            "angle": 20,
+            "speed": 1.1
+          }
+        },
+        {
+          "element": "text",
+          "props": {
+            "text": "Your demo. One prompt."
+          },
+          "position": {
+            "x": 0.5,
+            "y": 0.56
+          },
+          "depth": "foreground",
+          "style": {
+            "role": "display",
+            "size": 0.05
+          },
+          "enter": {
+            "anim": "wordReveal",
+            "easing": "spring",
+            "delay": 12
+          }
+        },
+        {
+          "element": "text",
+          "props": {
+            "text": "npx kaestral"
+          },
+          "position": {
+            "x": 0.5,
+            "y": 0.68
+          },
+          "depth": "mid",
+          "style": {
+            "role": "muted",
+            "size": 0.026
+          },
+          "enter": {
+            "anim": "typewriter",
+            "easing": "ease-out",
+            "delay": 26
+          }
+        }
+      ]
+    }
+  ]
+}

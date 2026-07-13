@@ -15,13 +15,13 @@ function roleColor(role: string | undefined): string {
   return TOKENS.ink; // "display" or unset
 }
 
-export const Text: React.FC<PrimitiveProps> = ({ props, frame, fps, height, opacity, blur, position, enter, style }) => {
+export const Text: React.FC<PrimitiveProps> = ({ props, frame, fps, width, height, opacity, blur, position, enter, style }) => {
   const text = typeof props.text === "string" ? props.text : "";
   const delay = enter?.delay ?? 0;
   const local = frame - delay;
 
   const size = style?.size ?? 0.086; // fraction of height, matches HeroDemo's thesis line
-  const fontSize = Math.round(height * size);
+  const fontSize = Math.round(Math.min(width, height) * size); // min() keeps portrait (9:16) titles inside the narrow frame
   const color = style?.role ? roleColor(style.role) : props.color ? tokenColor(String(props.color)) : roleColor(undefined);
 
   const anim = enter?.anim ?? "fade";

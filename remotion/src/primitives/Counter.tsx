@@ -10,7 +10,7 @@ import { TOKENS, tokenColor } from "./tokens";
 
 const ease = Easing.bezier(0.16, 1, 0.3, 1); // strong ease-out, no overshoot needed for a counter
 
-export const Counter: React.FC<PrimitiveProps> = ({ props, frame, height, opacity, blur, position, enter, style }) => {
+export const Counter: React.FC<PrimitiveProps> = ({ props, frame, width, height, opacity, blur, position, enter, style }) => {
   const target = typeof props.value === "number" ? props.value : 0;
   const label = typeof props.label === "string" ? props.label : undefined;
   const prefix = typeof props.prefix === "string" ? props.prefix : "";
@@ -29,7 +29,7 @@ export const Counter: React.FC<PrimitiveProps> = ({ props, frame, height, opacit
 
   const scale = interpolate(groupIn, [0, 1], [0.9, 1]);
   const size = style?.size ?? 0.14;
-  const fontSize = Math.round(height * size);
+  const fontSize = Math.round(Math.min(width, height) * size); // min() keeps portrait (9:16) titles inside the narrow frame
 
   return (
     <div

@@ -198,11 +198,11 @@ export function applyLightingSweep(
       position: "absolute",
       inset: 0,
       pointerEvents: "none",
-      backgroundImage: `linear-gradient(${angle}deg, transparent 0%, transparent 42%, rgba(255,255,255,0.55) 50%, transparent 58%, transparent 100%)`,
+      backgroundImage: `linear-gradient(${angle}deg, transparent 0%, transparent 46%, rgba(255,255,255,0.26) 50%, transparent 54%, transparent 100%)`,
       backgroundSize: `${sizePct}% ${sizePct}%`,
       backgroundPosition: `${posPct}% 50%`,
       mixBlendMode: "screen",
-      opacity: 0.55,
+      opacity: 0.32, // subtle specular pass; higher values wash out the content
     },
   };
 }

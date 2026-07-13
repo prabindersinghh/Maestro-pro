@@ -47,7 +47,7 @@ export const TextOnPath: React.FC<PrimitiveProps> = ({ props, frame, fps, width,
   const delay = enter?.delay ?? 0;
   const local = frame - delay;
   const size = style?.size ?? 0.1;
-  const fontSize = Math.round(height * size);
+  const fontSize = Math.round(Math.min(width, height) * size); // min() keeps portrait (9:16) titles inside the narrow frame
   const amplitude = fontSize * 0.7;
 
   const groupIn = spring({ frame: local, fps, config: { damping: 16, mass: 0.7 } });
