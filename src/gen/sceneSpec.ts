@@ -43,6 +43,9 @@ export const ASPECTS = ["16:9", "9:16", "1:1"] as const;
 // Additional closed enums used by nested modifier fields (per the SceneSpec block in the design spec).
 const EXIT_ANIMS = ["fade", "collapse", "glitch", "none"] as const;
 const ENTER_FROM = ["below", "left", "scale"] as const;
+// TASK 6: explicit opt-out of the beat-relative anti-clamp guardrail (resolveEntranceTiming) —
+// "auto" (default) keeps the guardrail; "manual" honors the authored `enter.delay` verbatim.
+export const ENTRANCE_PACING = ["auto", "manual"] as const;
 const MASK_REVEALS = ["left", "up", "iris", "none"] as const;
 const KEN_BURNS_MOVES = ["push", "drift", "zoom", "none"] as const;
 
@@ -92,6 +95,7 @@ export interface Enter {
   delay: number;
   from: (typeof ENTER_FROM)[number];
   snapToBeat: boolean;
+  pacing: (typeof ENTRANCE_PACING)[number];
   durationFrames?: number;
   spring?: SpringConfig;
 }
@@ -305,7 +309,7 @@ const TRANSITION_OUT_KEYS = ["kind", "accent", "snapToBeat", "overlapFrames", "e
 const MASK_KEYS = ["shape", "reveal"] as const;
 const KEN_BURNS_KEYS = ["move", "amount"] as const;
 const LIGHTING_SWEEP_KEYS = ["on", "angle", "speed"] as const;
-const ENTER_KEYS = ["anim", "easing", "delay", "from", "snapToBeat", "durationFrames", "spring"] as const;
+const ENTER_KEYS = ["anim", "easing", "delay", "from", "snapToBeat", "pacing", "durationFrames", "spring"] as const;
 const EXIT_KEYS = ["anim", "at", "easing", "durationFrames"] as const;
 const SPRING_CONFIG_KEYS = ["damping", "mass", "stiffness"] as const;
 const STYLE_KEYS = ["role", "size", "anchor", "font"] as const;
@@ -449,9 +453,10 @@ function validateEnter(value: unknown, path: string): Enter | undefined {
   const delay = clamp(obj.delay, 0, 600, 0);
   const from = obj.from === undefined ? "below" : checkEnum(obj.from, ENTER_FROM, `${path}.from`);
   const snapToBeat = obj.snapToBeat === undefined ? false : Boolean(obj.snapToBeat);
+  const pacing = obj.pacing === undefined ? "auto" : checkEnum(obj.pacing, ENTRANCE_PACING, `${path}.pacing`);
   const durationFrames = obj.durationFrames === undefined ? undefined : clamp(obj.durationFrames, 1, 600, 30);
   const spring = validateSpringConfig(obj.spring, `${path}.spring`);
-  const enter: Enter = { anim, easing, delay, from, snapToBeat };
+  const enter: Enter = { anim, easing, delay, from, snapToBeat, pacing };
   if (durationFrames !== undefined) enter.durationFrames = durationFrames;
   if (spring !== undefined) enter.spring = spring;
   return enter;

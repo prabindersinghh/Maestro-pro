@@ -375,11 +375,17 @@ const DEFAULT_POSITION = { x: 0.5, y: 0.5, snap: true };
  * 60-frame beat (which would otherwise settle at ~90% through the beat, smearing motion across the
  * whole thing) gets pulled back to complete within the first ~45%. This clamp only ever SHORTENS a
  * delay, never lengthens one, so a snappy authored entrance is untouched.
+ *
+ * TASK 6 ESCAPE HATCH — `enter.pacing:"manual"` opts a layer OUT of this auto-clamp entirely: the
+ * authored `delay` reaches the primitive verbatim, unclamped. This stays opt-in (default/absent ==
+ * `"auto"`, the guardrail above) — it's for an author deliberately staggering entrances that DO
+ * settle within the beat on their own, not a general escape from the guardrail's protection.
  */
 function resolveEnter(enter: EnterSpec | undefined, beatDurationInFrames: number): EnterSpec {
   const base: EnterSpec = enter ? { ...enter, easing: enter.easing ?? "spring", anim: enter.anim ?? (enter.easing === "linear" ? "fade" : "spring") } : { anim: "spring", easing: "spring", from: "below" };
   const authoredDelay = base.delay ?? 0;
-  return { ...base, delay: resolveEntranceTiming(authoredDelay, beatDurationInFrames) };
+  const delay = base.pacing === "manual" ? authoredDelay : resolveEntranceTiming(authoredDelay, beatDurationInFrames);
+  return { ...base, delay };
 }
 
 /** Default mask used when `enter.anim === "maskReveal"` but the layer authored no explicit

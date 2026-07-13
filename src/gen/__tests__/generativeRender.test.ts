@@ -735,4 +735,69 @@ describe("Generative render", () => {
     // in the same faded ballpark," not bit-exact equality with frame 32.
     expect(Math.abs(lumaAt78 - lumaAt32)).toBeLessThan(10);
   }, 240000);
+
+  // TASK 6 — enter.pacing:"manual" opt-out of the beat-relative anti-smear auto-clamp
+  // (resolveEntranceTiming in Generative.tsx's resolveEnter). On an 84-frame beat, the AUTO clamp's
+  // ceiling is `84*0.45 - 30 = 7.8` frames (see pacing.ts) — so ANY authored delay above ~7.8 gets
+  // pulled back under the default. This spec authors `delay:34` (well past that ceiling) WITH
+  // `pacing:"manual"`, which must reach the primitive completely unclamped. Proof: at frame 20 (past
+  // where the OLD auto-clamped delay of ~7.8 would already be visible/settling) the text region must
+  // still be DARK — the entrance hasn't even started — and by frame 70 (well past delay:34 + settle)
+  // it must be visible. Under the auto-clamp this assertion would FAIL (text already bright at frame
+  // 20), which is what makes this a real guard on `pacing:"manual"` rather than a coincidental pass.
+  it("renders enter.pacing:'manual' and honors a large authored delay VERBATIM, skipping the auto-clamp — dark at frame 20, visible by frame 70", async () => {
+    const v = validateSceneSpec({
+      meta: { aspect: "16:9", fps: 30 },
+      beats: [
+        {
+          durationInFrames: 84,
+          background: { kind: "solid", accent: "#0b0a0d" }, // solid black backdrop isolates the text's own luma
+          layers: [
+            {
+              element: "text",
+              props: { text: "Kaestral", color: "greenLight" },
+              position: { x: 0.5, y: 0.5, snap: false },
+              style: { role: "display", size: 0.14 },
+              enter: { anim: "wordStagger", delay: 34, pacing: "manual" },
+            },
+          ],
+        },
+      ],
+    });
+    expect(v.ok).toBe(true);
+    if (!v.ok) return;
+    if (v.ok) {
+      // Sanity-check the validator carried `pacing:"manual"` through verbatim before rendering.
+      expect(v.spec.beats[0].layers[0].enter!.pacing).toBe("manual");
+      expect(v.spec.beats[0].layers[0].enter!.delay).toBe(34);
+    }
+    const out = join(remotionDir, ".test-out", "gen-enter-pacing-manual.mp4");
+    const res = await renderRemotion("Generative", { spec: v.spec }, out, remotionDir);
+    expect(res.width).toBe(1920);
+    expect(res.height).toBe(1080);
+    // Baseline "actually rendered, not blank" proxy, matching every other test in this file.
+    expect(statSync(out).size).toBeGreaterThan(8000);
+
+    const ffmpegAvailable = await checkFfmpegAvailable();
+    if (!ffmpegAvailable) {
+      // Environment without ffmpeg: the render assertions above already prove the spec is legal and
+      // renders successfully with `pacing:"manual"`; the pixel-level unclamped-delay proof is
+      // skipped in this case.
+      return;
+    }
+    const cropAtCenter = { x: 1920 * 0.5 - 1920 * 0.2, y: 1080 * 0.5 - 1080 * 0.12, w: 1920 * 0.4, h: 1080 * 0.24 };
+    // Frame 20: well past the AUTO clamp's ceiling delay (~7.8 frames on this 84-frame beat) plus
+    // its settle window — under the OLD/auto behavior the text would already be bright here. With
+    // pacing:"manual" honoring delay:34 verbatim, the entrance hasn't even started yet at frame 20,
+    // so this region must still read near the dark background floor.
+    const lumaAt20 = await meanLumaOfCrop(out, 20, cropAtCenter);
+    // Frame 70: comfortably past delay:34 plus its settle window (~30 frames -> settled by ~64),
+    // and still before this beat's own final-18-frames outFade default ([66,84) on an 84f beat) —
+    // pick a spot inside the settled-but-not-yet-fading band; 70 sits just past outFade start (66)
+    // but interpolate's fade there is gradual, so use the ratio against frame 20 to prove the
+    // entrance genuinely happened rather than requiring near-peak brightness.
+    const lumaAt70 = await meanLumaOfCrop(out, 70, cropAtCenter);
+    expect(lumaAt20).toBeLessThan(20); // still dark — entrance has not started (delay:34 survived unclamped)
+    expect(lumaAt70).toBeGreaterThan(lumaAt20 + 15); // visible later — the entrance did eventually play
+  }, 240000);
 });

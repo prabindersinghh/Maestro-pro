@@ -19,6 +19,12 @@ export interface EnterSpec {
   delay?: number;
   from?: "below" | "left" | "scale";
   snapToBeat?: boolean;
+  /** TASK 6 — explicit opt-out of the beat-relative anti-smear auto-clamp (`resolveEntranceTiming`
+   * in Generative.tsx's `resolveEnter`). Default (absent or `"auto"`) keeps the guardrail: every
+   * authored `delay` is pulled back so the entrance still settles within the first ~half of the
+   * beat. `"manual"` honors the authored `delay` verbatim — the escape hatch for a deliberately
+   * staggered spec whose entrances already settle within the beat on their own. */
+  pacing?: "auto" | "manual";
   durationFrames?: number;
   spring?: SpringConfig;
   /**

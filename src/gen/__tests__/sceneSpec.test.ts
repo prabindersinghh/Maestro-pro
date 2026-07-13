@@ -250,6 +250,27 @@ describe("validateSceneSpec", () => {
       expect(r.ok).toBe(true);
       if (r.ok) expect(r.spec.beats[0].layers[0].enter!.anim).toBe("wordStagger");
     });
+
+    // TASK 6: enter.pacing — explicit opt-out of the beat-relative anti-smear auto-clamp.
+    describe("enter.pacing", () => {
+      it("accepts pacing:'manual' and returns it verbatim", () => {
+        const r = validateSceneSpec(specWith({ enter: { anim: "wordStagger", delay: 16, pacing: "manual" } }));
+        expect(r.ok).toBe(true);
+        if (r.ok) expect(r.spec.beats[0].layers[0].enter!.pacing).toBe("manual");
+      });
+
+      it("defaults pacing to 'auto' when absent", () => {
+        const r = validateSceneSpec(specWith({ enter: { anim: "wordStagger", delay: 16 } }));
+        expect(r.ok).toBe(true);
+        if (r.ok) expect(r.spec.beats[0].layers[0].enter!.pacing).toBe("auto");
+      });
+
+      it("rejects an unknown pacing value with the offending path", () => {
+        const r = validateSceneSpec(specWith({ enter: { anim: "wordStagger", delay: 16, pacing: "bogus" } }));
+        expect(r.ok).toBe(false);
+        if (!r.ok) expect(r.error).toMatch(/enter\.pacing/);
+      });
+    });
   });
 
   // TASK 6b4 — camera.easing (bezier-shaped push-in/pan/parallax) + beat.outFade (authorable
