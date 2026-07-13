@@ -243,5 +243,12 @@ describe("validateSceneSpec", () => {
       expect(r.ok).toBe(false);
       if (!r.ok) expect(r.error).toMatch(/animate/);
     });
+
+    // TASK 6b3 — per-word spring stagger reveal anim.
+    it("accepts enter.anim:'wordStagger'", () => {
+      const r = validateSceneSpec(specWith({ enter: { anim: "wordStagger", spring: { damping: 16, mass: 1, stiffness: 100 }, delay: 16 } }));
+      expect(r.ok).toBe(true);
+      if (r.ok) expect(r.spec.beats[0].layers[0].enter!.anim).toBe("wordStagger");
+    });
   });
 });

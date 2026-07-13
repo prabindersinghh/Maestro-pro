@@ -578,4 +578,79 @@ describe("Generative render", () => {
     expect(rightOfAnchorLuma).toBeGreaterThan(30);
     expect(leftOfAnchorLuma).toBeLessThan(20);
   }, 240000);
+
+  // TASK 6b3 — wordStagger: a REAL per-word spring stagger (opacity + translateY 12->0, each word
+  // springing up independently with an i*4-frame offset), unlike wordReveal's flat word-COUNT
+  // reveal (all-visible words instantly fully opaque, no per-word transform). This spec renders
+  // "Total precision. Then it strikes." left-anchored at x:0.12, mono font, size:0.06 — at that
+  // size a monospace advance places the FIRST word ("Total") roughly at x:[0.13,0.20] and the LAST
+  // word ("strikes.") roughly at x:[0.56,0.64] (calibrated against an actual rendered frame),
+  // giving two well-separated horizontal bands to sample.
+  it("renders wordStagger with SEQUENTIAL per-word reveal — early frame shows only the first word, later frame shows the last word too", async () => {
+    const v = validateSceneSpec({
+      meta: { aspect: "16:9", fps: 30 },
+      beats: [
+        {
+          durationInFrames: 150, // generous so enter.delay:16 is not pulled back by resolveEntranceTiming's hold/settle clamp
+          background: { kind: "solid", accent: "#0b0a0d" }, // solid black backdrop isolates the text's own luma
+          layers: [
+            {
+              element: "text",
+              props: { text: "Total precision. Then it strikes." },
+              position: { x: 0.12, y: 0.4, snap: false },
+              style: { role: "display", size: 0.06, anchor: "left", font: "mono" },
+              enter: { anim: "wordStagger", spring: { damping: 16, mass: 1, stiffness: 100 }, delay: 16 },
+            },
+          ],
+        },
+      ],
+    });
+    expect(v.ok).toBe(true);
+    if (!v.ok) return;
+    const out = join(remotionDir, ".test-out", "gen-text-word-stagger.mp4");
+    const res = await renderRemotion("Generative", { spec: v.spec }, out, remotionDir);
+    expect(res.width).toBe(1920);
+    expect(res.height).toBe(1080);
+    // Baseline "actually rendered, not blank" proxy, matching every other test in this file.
+    expect(statSync(out).size).toBeGreaterThan(8000);
+
+    const ffmpegAvailable = await checkFfmpegAvailable();
+    if (!ffmpegAvailable) {
+      // Environment without ffmpeg: the render assertions above already prove the spec is legal
+      // and renders successfully; the pixel-level sequential-reveal proof is skipped in this case.
+      return;
+    }
+
+    // EARLY frame: delay=16, word i's spring frame = local - i*4 (local = frame - 16). At frame 24
+    // (local=8), word 0's spring frame is 8 (well into its damping:16 spring rise, ~85% opacity —
+    // comfortably bright ink), while word 5's ("strikes.") spring frame is 8 - 20 = -12 —
+    // Remotion's spring() clamps negative frames to progress 0, so it must be fully invisible
+    // (background floor only). This is the crux of the sequential-vs-all-at-once distinction:
+    // wordReveal or a flat fade would show BOTH bands identically bright at this frame.
+    const earlyFrame = 24;
+    const firstWordBandEarly = await meanLumaOfCrop(out, earlyFrame, {
+      x: 1920 * 0.13, y: 1080 * 0.4 - 1080 * 0.1, w: 1920 * 0.07, h: 1080 * 0.2,
+    });
+    const lastWordBandEarly = await meanLumaOfCrop(out, earlyFrame, {
+      x: 1920 * 0.56, y: 1080 * 0.4 - 1080 * 0.1, w: 1920 * 0.08, h: 1080 * 0.2,
+    }); // "strikes." lands roughly x:[0.56,0.64] at this size/position (calibrated against an actual rendered frame)
+
+    // LATER frame: comfortably past every word's settle point (last word's spring starts at
+    // local=20 i.e. frame=36, settles ~30 frames later around frame=66) and still well before this
+    // beat's own OUT_FADE_FRAMES resolve (durationInFrames:150 fades out only in its final 18
+    // frames, [132,150)).
+    const laterFrame = 90;
+    const firstWordBandLater = await meanLumaOfCrop(out, laterFrame, {
+      x: 1920 * 0.13, y: 1080 * 0.4 - 1080 * 0.1, w: 1920 * 0.07, h: 1080 * 0.2,
+    });
+    const lastWordBandLater = await meanLumaOfCrop(out, laterFrame, {
+      x: 1920 * 0.56, y: 1080 * 0.4 - 1080 * 0.1, w: 1920 * 0.08, h: 1080 * 0.2,
+    });
+
+    // Solid #0b0a0d background reads luma ~11; bright ink (#eaeaef) reads far brighter.
+    expect(firstWordBandEarly).toBeGreaterThan(20); // first word already visible early
+    expect(lastWordBandEarly).toBeLessThan(20); // last word NOT visible yet — proves sequential, not all-at-once
+    expect(firstWordBandLater).toBeGreaterThan(20); // first word still visible later
+    expect(lastWordBandLater).toBeGreaterThan(20); // last word now visible too — sequential reveal completed
+  }, 240000);
 });

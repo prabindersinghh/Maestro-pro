@@ -18,7 +18,7 @@ export const ELEMENTS = [
 ] as const;
 
 export const ANIMS = [
-  "spring", "typewriter", "wordReveal", "kinetic", "draw", "fade", "collapse", "maskReveal",
+  "spring", "typewriter", "wordReveal", "wordStagger", "kinetic", "draw", "fade", "collapse", "maskReveal",
 ] as const;
 
 export const EASINGS = ["ease-out", "spring", "linear"] as const;

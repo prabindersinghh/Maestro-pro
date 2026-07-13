@@ -14,7 +14,7 @@ export interface SpringConfig {
 }
 
 export interface EnterSpec {
-  anim: "spring" | "typewriter" | "wordReveal" | "kinetic" | "draw" | "fade" | "collapse" | "maskReveal";
+  anim: "spring" | "typewriter" | "wordReveal" | "wordStagger" | "kinetic" | "draw" | "fade" | "collapse" | "maskReveal";
   easing?: EasingSpec;
   delay?: number;
   from?: "below" | "left" | "scale";

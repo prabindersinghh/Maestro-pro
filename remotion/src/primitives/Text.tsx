@@ -67,6 +67,15 @@ export const Text: React.FC<PrimitiveProps> = ({ props, frame, fps, width, heigh
     );
     visibleText = words.slice(0, revealed).join(" ");
     animOpacity = 1;
+  } else if (anim === "wordStagger") {
+    // TASK 6b3 — REAL per-word spring stagger (the hand-authored-film idiom): unlike wordReveal's
+    // flat word-COUNT reveal (Math.floor of a count over time, all-visible words instantly fully
+    // opaque, no per-word transform), each word here springs up INDEPENDENTLY — its own
+    // opacity+translateY(12->0) driven by its own spring, offset by a fixed 4-frame stagger per
+    // word index. The wrapper's own `animOpacity` stays 1 (set below): each word carries its own
+    // opacity, so the outer div must not ALSO apply a wrapper-level fade (that would double-apply
+    // and desync from the per-word timing proven by the render test).
+    animOpacity = 1;
   } else if (anim === "kinetic") {
     const p = spring({ frame: local, fps, config: { damping: 12, mass: 0.6 } });
     animOpacity = p;
@@ -120,6 +129,12 @@ export const Text: React.FC<PrimitiveProps> = ({ props, frame, fps, width, heigh
   const baseTranslateX = anchor === "left" ? "0" : anchor === "right" ? "-100%" : "-50%";
   const textAlign = anchor === "left" ? "left" : anchor === "right" ? "right" : "center";
 
+  // TASK 6b3 — wordStagger renders one span PER WORD instead of a single text node, each with its
+  // own independent spring-driven opacity/translateY. The OUTER div (below) still owns anchor/
+  // position/font/color/letterSpacing exactly like every other branch — this only lays the words
+  // out in a row inside it, so anchor placement from Task 6b1 keeps working unmodified.
+  const words = anim === "wordStagger" ? text.split(" ") : null;
+
   return (
     <div
       style={{
@@ -143,9 +158,36 @@ export const Text: React.FC<PrimitiveProps> = ({ props, frame, fps, width, heigh
         letterSpacing: -1.5,
         textAlign,
         whiteSpace: "pre",
+        ...(words ? { display: "flex", flexWrap: "nowrap" as const } : {}),
       }}
     >
-      {visibleText}
+      {words
+        ? words.map((word, i) => {
+            // `local` already has `enter.delay` subtracted (see top of component); each word adds
+            // its own fixed 4-frame stagger on top of that shared base delay.
+            const wp = spring({
+              frame: local - i * 4,
+              fps,
+              config: enter?.spring ?? { damping: 16 },
+            });
+            const wordOpacity = enter?.neutralizeOpacity ? 1 : wp;
+            const wordTranslateY = interpolate(wp, [0, 1], [12, 0]);
+            return (
+              <span
+                key={`${word}-${i}`}
+                style={{
+                  display: "inline-block",
+                  opacity: wordOpacity,
+                  transform: `translateY(${wordTranslateY}px)`,
+                  marginRight: i < words.length - 1 ? "0.28em" : 0,
+                  whiteSpace: "pre",
+                }}
+              >
+                {word}
+              </span>
+            );
+          })
+        : visibleText}
     </div>
   );
 };
