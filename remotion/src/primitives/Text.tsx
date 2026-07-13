@@ -1,6 +1,7 @@
 import { interpolate, spring, Easing } from "remotion";
 import type { PrimitiveProps } from "./types";
 import { TOKENS, tokenColor } from "./tokens";
+import { bezierFromSpec } from "./easing";
 
 // Ported from `remotion/src/compositions/HeroDemo.tsx` beat 3 (the thesis line): white display
 // text with a green-accent second line, heavy weight, tight negative letter-spacing, spring
@@ -33,7 +34,10 @@ export const Text: React.FC<PrimitiveProps> = ({ props, frame, fps, width, heigh
   let scale = 1;
 
   if (anim === "spring") {
-    const p = spring({ frame: local, fps, config: { damping: 15 } });
+    // TASK 5 UPGRADE — `enter.spring` lets an authored spec tune the entrance's physics
+    // (damping/mass/stiffness) instead of always getting the hardcoded `{damping:15}` default.
+    const springConfig = enter?.spring ?? { damping: 15, mass: 1, stiffness: 100 };
+    const p = spring({ frame: local, fps, config: springConfig });
     animOpacity = p;
     const from = enter?.from ?? "below";
     // Pure directional slide, no scale (forensic delta #1 — HeroDemo display text never scale-pops).
@@ -68,14 +72,17 @@ export const Text: React.FC<PrimitiveProps> = ({ props, frame, fps, width, heigh
     animOpacity = p;
     translateY = interpolate(p, [0, 1], [40, 0]);
     scale = interpolate(p, [0, 1], [1.15, 1]);
-  } else if (enter?.easing === "linear") {
-    // Explicit escape hatch: a spec that sets easing:"linear" must render a plain linear fade,
-    // never the spring default below (defaults only fill gaps, they never override an authored
-    // choice) — also covers karaoke/draw/collapse/maskReveal until later tasks implement them.
+  } else if (enter?.easing === "linear" || (enter?.easing !== undefined && enter.easing !== "spring")) {
+    // Explicit escape hatch: a spec that sets an explicit easing OTHER than "spring" (the literal
+    // preset "linear", OR a custom `{curve:[...]}` bezier) must render a plain fade shaped by that
+    // curve, never the hardcoded spring default below (defaults only fill gaps, they never override
+    // an authored choice) — also covers karaoke/draw/collapse/maskReveal until later tasks implement
+    // them. TASK 5 UPGRADE — routes through `bezierFromSpec` so a custom curve (not just the
+    // "linear" preset) is honored here too, via the single shared bezier-resolution path.
     animOpacity = interpolate(local, [0, 12], [0, 1], {
       extrapolateLeft: "clamp",
       extrapolateRight: "clamp",
-      easing: Easing.linear,
+      easing: Easing.bezier(...bezierFromSpec(enter?.easing)),
     });
   } else {
     // DEFAULT (no anim authored, or anim falls through e.g. karaoke/draw/collapse/maskReveal):

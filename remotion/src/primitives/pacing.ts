@@ -21,8 +21,10 @@ export const ENTRANCE_COMPLETE_BY_FRACTION = 0.45;
  * ENGINE-DEFECTS.md's easing audit — which settles to ~99% by frame ~28-32 at 30fps). Used to back
  * out the LATEST delay that still leaves the entrance time to finish inside the hold-settle
  * window, rather than just clamping the delay to the window boundary itself (which would let the
- * spring START at the boundary and visibly finish mid-hold — still "smearing" into the hold). */
-const ASSUMED_ENTRANCE_SETTLE_FRAMES = 30;
+ * spring START at the boundary and visibly finish mid-hold — still "smearing" into the hold).
+ * Exported so `Generative.tsx`'s explicit `layer.hold` freeze can reuse the same "how long until an
+ * entrance is settled" estimate rather than inventing a second constant. */
+export const ASSUMED_ENTRANCE_SETTLE_FRAMES = 30;
 
 /**
  * Resolves the authored entrance `delay` (frames, already range-clamped 0..600 by

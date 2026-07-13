@@ -40,7 +40,7 @@ export { applyKenBurns, applyDepthOfField, applyMotionBlur, applyLightingSweep }
 export type { KenBurnsSpec, LightingSweepSpec, MotionBlurResult } from "./modifiers";
 export { resolveLayoutPosition, SAFE_MARGIN } from "./layout";
 export type { ResolvedPosition } from "./layout";
-export { resolveEntranceTiming, ENTRANCE_COMPLETE_BY_FRACTION } from "./pacing";
+export { resolveEntranceTiming, ENTRANCE_COMPLETE_BY_FRACTION, ASSUMED_ENTRANCE_SETTLE_FRAMES } from "./pacing";
 
 // Re-exported for beat-level background rendering (BG_KINDS "grid"/"glow" in sceneSpec.ts) —
 // consumed directly by Generative.tsx in a later task, not addressed by a SceneSpec element name

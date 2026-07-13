@@ -258,4 +258,24 @@ describe("Generative render", () => {
     // larger than a flat background alone — a coarse but effective "actually rendered" proxy.
     expect(statSync(out).size).toBeGreaterThan(15000);
   }, 240000);
+
+  it("renders a spec using per-property animate + hold + bezier easing + custom overlap", async () => {
+    const v = validateSceneSpec({
+      meta: { aspect: "16:9", fps: 30 },
+      beats: [
+        { durationInFrames: 60, transitionOut: { kind: "wipe", overlapFrames: 22 },
+          layers: [{ element: "text", props: { text: "One" }, position: { x: 0.3, y: 0.45, snap: false },
+            animate: { opacity: { from: 0, to: 1, startFrame: 0, durationFrames: 14, easing: { curve: [0.2, 0.8, 0.2, 1] } },
+                       position: { from: { x: 0.3, y: 0.45 }, to: { x: 0.42, y: 0.45 }, startFrame: 0, durationFrames: 20, easing: "ease-out" } },
+            hold: { startFrame: 22, durationFrames: 30 } }] },
+        { durationInFrames: 60, layers: [{ element: "text", props: { text: "Two" }, enter: { anim: "spring", spring: { damping: 15, mass: 0.7, stiffness: 120 } } }] },
+      ],
+    });
+    expect(v.ok).toBe(true);
+    if (!v.ok) return;
+    const out = join(remotionDir, ".test-out", "art.mp4");
+    const res = await renderRemotion("Generative", { spec: v.spec }, out, remotionDir);
+    expect(res.width).toBe(1920);
+    expect(statSync(out).size).toBeGreaterThan(10000);
+  }, 240000);
 });

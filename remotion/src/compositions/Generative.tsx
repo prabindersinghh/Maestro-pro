@@ -1,4 +1,4 @@
-import { AbsoluteFill, Sequence, interpolate, useCurrentFrame } from "remotion";
+import { AbsoluteFill, Sequence, interpolate, useCurrentFrame, Easing } from "remotion";
 import {
   REGISTRY,
   Grid,
@@ -16,10 +16,13 @@ import {
   applyLightingSweep,
   resolveLayoutPosition,
   resolveEntranceTiming,
+  ASSUMED_ENTRANCE_SETTLE_FRAMES,
 } from "../primitives";
 import type { CameraSpec, TransitionKind, MaskShape, MaskReveal } from "../primitives";
 import { TOKENS, tokenColor } from "../primitives/tokens";
 import type { PrimitiveProps, EnterSpec, StyleSpec } from "../primitives/types";
+import { bezierFromSpec } from "../primitives/easing";
+import type { EasingSpec } from "../primitives/easing";
 
 // The trusted interpreter: takes a *validated* SceneSpec (never agent-authored code) and maps it
 // onto the primitive registry. It never executes anything from the spec beyond reading its
@@ -109,6 +112,8 @@ export interface TransitionOut {
   kind: TransitionKind;
   accent: string;
   snapToBeat?: boolean;
+  overlapFrames?: number;
+  easing?: EasingSpec;
 }
 
 export interface MaskField {
@@ -130,12 +135,53 @@ export interface LightingSweepField {
 export interface ExitField {
   anim: "fade" | "collapse" | "glitch" | "none";
   at: number;
+  easing?: EasingSpec;
+  durationFrames?: number;
+}
+
+/** Mirrors `src/gen/sceneSpec.ts`'s `Layer.hold` — an explicit static window where the element must
+ * render at its fully-settled state, no residual entrance motion. */
+export interface HoldField {
+  startFrame: number;
+  durationFrames: number;
+}
+
+/** Mirrors `src/gen/sceneSpec.ts`'s `Tween` — one scalar property's independent keyframe curve
+ * under `Layer.animate` (opacity/scale/blur/rotation). */
+export interface TweenField {
+  from: number;
+  to: number;
+  startFrame: number;
+  durationFrames: number;
+  easing: EasingSpec;
+}
+
+/** Mirrors `src/gen/sceneSpec.ts`'s `PositionTween` — same shape as `TweenField` but `from`/`to`
+ * are normalized `{x,y}` points, for `Layer.animate.position`. */
+export interface PositionTweenField {
+  from: { x: number; y: number };
+  to: { x: number; y: number };
+  startFrame: number;
+  durationFrames: number;
+  easing: EasingSpec;
+}
+
+/** Mirrors `src/gen/sceneSpec.ts`'s `Animate` — independent per-property tweens, each the SOLE
+ * driver of that property when present (the validator forbids `enter`/`exit` also driving the same
+ * property, so `BeatLayer` doesn't need to arbitrate conflicts, only route each property to
+ * whichever of `animate.<prop>` / enter-exit is present). */
+export interface AnimateField {
+  position?: PositionTweenField;
+  opacity?: TweenField;
+  scale?: TweenField;
+  blur?: TweenField;
+  rotation?: TweenField;
 }
 
 export interface Layer {
   element: string;
   props: Record<string, unknown>;
-  position: { x: number; y: number };
+  position: { x: number; y: number; snap?: boolean };
   opacity: number;
   blur: number;
   depth?: "foreground" | "mid" | "background";
@@ -146,6 +192,8 @@ export interface Layer {
   enter?: EnterSpec;
   exit?: ExitField;
   style?: StyleSpec;
+  hold?: HoldField;
+  animate?: AnimateField;
 }
 
 export interface Beat {
@@ -332,17 +380,29 @@ const EXIT_GLITCH_FRAMES = 12;
  * applyTransition) so a per-layer glitch exit reads as the same family of effect, just scoped to
  * one layer instead of the whole frame. Returns `undefined` only BEFORE `exit.at` (the layer hasn't
  * started exiting yet) or for any other/no exit anim.
+ *
+ * TASK 5 UPGRADE — `exit.durationFrames` (when authored) replaces the hardcoded
+ * `EXIT_GLITCH_FRAMES` burst length, and `exit.easing` shapes the burst's opacity fade-out (routed
+ * through the shared `bezierFromSpec` path, same as `enter.easing`) — the jitter/hue-shift/split
+ * visuals themselves stay driven by the raw linear burst progress so the glitch's own character is
+ * unaffected, only the opacity envelope is eased.
  */
 function glitchExitStyle(exit: ExitField | undefined, frame: number): React.CSSProperties | undefined {
   if (!exit || exit.anim !== "glitch") return undefined;
+  const burstFrames = exit.durationFrames ?? EXIT_GLITCH_FRAMES;
   const local = frame - exit.at;
   if (local < 0) return undefined; // exit hasn't started yet — render normally
-  if (local > EXIT_GLITCH_FRAMES) return { opacity: 0 }; // burst finished — stay gone, never pop back
-  const p = local / EXIT_GLITCH_FRAMES; // 0..1 across the burst
+  if (local > burstFrames) return { opacity: 0 }; // burst finished — stay gone, never pop back
+  const p = local / burstFrames; // 0..1 across the burst — drives the jitter/split visuals
+  const easedOpacity = interpolate(local, [0, burstFrames], [1, 0], {
+    extrapolateLeft: "clamp",
+    extrapolateRight: "clamp",
+    easing: Easing.bezier(...bezierFromSpec(exit.easing)),
+  });
   const jitter = Math.sin(p * 50) * (1 - p) * 14;
   const split = Math.sin(p * Math.PI) * 10;
   return {
-    opacity: 1 - p,
+    opacity: easedOpacity,
     transform: `translateX(${jitter}px)`,
     filter: [
       `hue-rotate(${(1 - p) * 50}deg)`,
@@ -371,16 +431,130 @@ const BeatLayer: React.FC<{
   // Defensive defaults: a spec rendered outside `validateSceneSpec` (e.g. a bare hand-authored
   // JSON prop) may omit opacity/blur/position entirely — never let a missing field crash a
   // primitive or silently produce NaN styles.
-  const opacity = layer.opacity ?? 1;
-  const blur = layer.blur ?? 0;
-  // TASK 10 UPGRADE — layout system (ENGINE-DEFECTS.md root cause A): every layer's authored
-  // position runs through `resolveLayoutPosition` (safe-area clamp + baseline-grid snap) before it
-  // ever reaches a primitive, so a guessed decimal never lands a few px off — see
-  // `../primitives/layout.ts` for the full rationale.
-  const rawPosition = layer.position ?? DEFAULT_POSITION;
-  const position = resolveLayoutPosition(rawPosition, width, height);
+  const opacity0 = layer.opacity ?? 1;
+  const blur0 = layer.blur ?? 0;
 
-  const resolvedEnter = resolveEnter(layer.enter, durationInFrames);
+  // TASK 5 UPGRADE — per-property `layer.animate` must be the SOLE driver of any property it
+  // covers: the validator (`checkAnimateConflicts` in src/gen/sceneSpec.ts) only rejects an
+  // AUTHORED `enter`/`exit` that conflicts with `animate`, but `resolveEnter` below fills in a
+  // default spring entrance whenever `enter` is missing entirely — which WOULD still drive
+  // opacity/position internally (every primitive multiplies its own entrance opacity/offset into
+  // its render) even though no explicit conflict was authored. So: whenever `animate.opacity` or
+  // `animate.position` is present, force the entrance down every primitive's plain-fade path (an
+  // `anim` that matches no special-cased branch + explicit non-"spring" easing — see Text.tsx's
+  // linear-escape-hatch branch and Shape.tsx's `else` branch) and feed it an already-settled
+  // entrance frame (see `entranceFrame` below) so the internal fade has already clamped to fully
+  // opaque with zero directional offset — `animate`'s own externally-computed position/opacity
+  // becomes the only thing actually moving that property.
+  const animateNeutralizesEnter = !!(layer.animate?.opacity || layer.animate?.position);
+  const effectiveAuthoredEnter = animateNeutralizesEnter
+    ? { anim: "fade" as const, easing: "linear" as const, delay: 0, from: layer.enter?.from, snapToBeat: false }
+    : layer.enter;
+  const resolvedEnter = resolveEnter(effectiveAuthoredEnter, durationInFrames);
+
+  // TASK 5 UPGRADE — explicit `layer.hold`: during [hold.startFrame, hold.startFrame+durationFrames]
+  // the element must render STATIC — settled, no residual entrance motion. Every primitive's
+  // internal spring/interpolate math is driven entirely by the `frame` value it's handed (see
+  // Text/Shape/etc's `local = frame - delay`), so freezing is done by clamping the EFFECTIVE frame
+  // fed to entrance-driven rendering to the point the entrance is guaranteed to have settled
+  // (`resolvedEnter.delay` + however long the entrance takes to settle — an authored
+  // `enter.durationFrames` when present, else the same generic estimate `pacing.ts` uses for
+  // delay-clamping), rather than ever letting `frame` keep advancing past that point while inside
+  // the hold window — `Math.min` keeps this monotonic so the entrance still animates normally right
+  // up until it settles, then holds flat. When `animate` neutralized the entrance above,
+  // `entranceFrame` is ALWAYS pushed past its settle point regardless of any hold — the neutralized
+  // entrance must never be visible, hold window or not.
+  const hold = layer.hold;
+  const inHoldWindow = !!hold && frame >= hold.startFrame && frame <= hold.startFrame + hold.durationFrames;
+  const settleFrame = (resolvedEnter.delay ?? 0) + (resolvedEnter.durationFrames ?? ASSUMED_ENTRANCE_SETTLE_FRAMES);
+  const holdFreezeFrame = hold ? Math.max(hold.startFrame, settleFrame) : Infinity;
+  const entranceFrame = animateNeutralizesEnter
+    ? Math.max(frame, settleFrame)
+    : inHoldWindow
+      ? Math.min(frame, holdFreezeFrame)
+      : frame;
+
+  // TASK 5 UPGRADE — per-property `layer.animate`: each of position/opacity/scale/blur/rotation is
+  // independently tweened when `layer.animate.<prop>` is present, and becomes the SOLE driver of
+  // that property (the validator already forbids `enter`/`exit` also driving the same property, see
+  // `checkAnimateConflicts` in src/gen/sceneSpec.ts) — so `enter`/`exit` must NOT also touch a
+  // property that `animate` drives. `animateFrame` is separately clamped to the hold window (same
+  // freeze semantics as `entranceFrame` above) so an animate tween that's still running when a hold
+  // begins doesn't keep drifting through the hold — `extrapolateRight:"clamp"` on each `interpolate`
+  // call below means a tween already finished before the hold starts is unaffected either way.
+  const animateFrame = inHoldWindow ? Math.min(frame, hold!.startFrame + hold!.durationFrames) : frame;
+
+  function tweenEasing(spec: EasingSpec | undefined) {
+    return Easing.bezier(...bezierFromSpec(spec));
+  }
+
+  const animate = layer.animate;
+
+  // position: animate.position overrides the static authored position entirely for its window
+  // (extrapolate-clamp holds it at `to` beyond the tween's own end) — x/y tweened independently.
+  const rawPosition = layer.position ?? DEFAULT_POSITION;
+  const staticPosition = resolveLayoutPosition(rawPosition, width, height, rawPosition.snap);
+  let position = staticPosition;
+  if (animate?.position) {
+    const t = animate.position;
+    const easingFn = tweenEasing(t.easing);
+    const x = interpolate(animateFrame, [t.startFrame, t.startFrame + t.durationFrames], [t.from.x, t.to.x], {
+      easing: easingFn,
+      extrapolateLeft: "clamp",
+      extrapolateRight: "clamp",
+    });
+    const y = interpolate(animateFrame, [t.startFrame, t.startFrame + t.durationFrames], [t.from.y, t.to.y], {
+      easing: easingFn,
+      extrapolateLeft: "clamp",
+      extrapolateRight: "clamp",
+    });
+    position = resolveLayoutPosition({ x, y }, width, height, rawPosition.snap);
+  }
+
+  // opacity: animate.opacity overrides the static authored opacity for its window.
+  let opacity = opacity0;
+  if (animate?.opacity) {
+    const t = animate.opacity;
+    opacity = interpolate(animateFrame, [t.startFrame, t.startFrame + t.durationFrames], [t.from, t.to], {
+      easing: tweenEasing(t.easing),
+      extrapolateLeft: "clamp",
+      extrapolateRight: "clamp",
+    });
+  }
+
+  // blur: animate.blur overrides the static authored blur (still combined with DOF/motion blur
+  // below into one `totalBlur`, same as the static `layer.blur` always was).
+  let blur = blur0;
+  if (animate?.blur) {
+    const t = animate.blur;
+    blur = interpolate(animateFrame, [t.startFrame, t.startFrame + t.durationFrames], [t.from, t.to], {
+      easing: tweenEasing(t.easing),
+      extrapolateLeft: "clamp",
+      extrapolateRight: "clamp",
+    });
+  }
+
+  // scale/rotation: no existing PrimitiveProps slot (primitives manage their own internal
+  // enter-driven transform) — applied as an outer CSS transform wrapper around the whole rendered
+  // element, same pattern as the existing Ken Burns transform wrapper below.
+  let animateScale: number | undefined;
+  if (animate?.scale) {
+    const t = animate.scale;
+    animateScale = interpolate(animateFrame, [t.startFrame, t.startFrame + t.durationFrames], [t.from, t.to], {
+      easing: tweenEasing(t.easing),
+      extrapolateLeft: "clamp",
+      extrapolateRight: "clamp",
+    });
+  }
+  let animateRotation: number | undefined;
+  if (animate?.rotation) {
+    const t = animate.rotation;
+    animateRotation = interpolate(animateFrame, [t.startFrame, t.startFrame + t.durationFrames], [t.from, t.to], {
+      easing: tweenEasing(t.easing),
+      extrapolateLeft: "clamp",
+      extrapolateRight: "clamp",
+    });
+  }
 
   // Fixed composition order (per the design spec): kenBurns transform -> element -> mask clip ->
   // depth-of-field blur -> motion-blur/trail -> lighting-sweep overlay -> opacity/position
@@ -395,9 +569,11 @@ const BeatLayer: React.FC<{
   const motion = applyMotionBlur(layer.motionBlur, frame, fps);
   const totalBlur = blur + dofBlurPx + motion.blurPx;
 
+  // Route enter/exit through `entranceFrame` (frozen during a hold window) rather than the raw
+  // beat-local `frame` — `animate`-driven properties above already use their own `animateFrame`.
   const primitiveProps: PrimitiveProps = {
     props: layer.props,
-    frame,
+    frame: entranceFrame,
     fps,
     width,
     height,
@@ -415,10 +591,22 @@ const BeatLayer: React.FC<{
   // relative to a full-size ancestor, per PrimitiveProps convention).
   const kenBurnsTransform = applyKenBurns(layer.kenBurns, frame, durationInFrames);
 
+  // TASK 5 UPGRADE — `animate.scale`/`animate.rotation` have no existing PrimitiveProps slot (every
+  // primitive manages its own internal enter-driven transform), so they're composited here as an
+  // outer CSS transform alongside Ken Burns — the one place that already transforms "the element
+  // itself" independent of the primitive's own internal motion. Composes with an authored Ken Burns
+  // move (both apply; order chosen to match how CSS `transform` reads left-to-right) rather than
+  // silently overriding it.
+  const animateTransformParts: string[] = [];
+  if (kenBurnsTransform) animateTransformParts.push(kenBurnsTransform);
+  if (animateScale !== undefined) animateTransformParts.push(`scale(${animateScale})`);
+  if (animateRotation !== undefined) animateTransformParts.push(`rotate(${animateRotation}deg)`);
+  const elementTransform = animateTransformParts.length > 0 ? animateTransformParts.join(" ") : undefined;
+
   // 2) element — the primitive (already rendering with the combined DOF/motion/authored blur
-  // baked in via primitiveProps.blur above), wrapped by its Ken Burns transform.
+  // baked in via primitiveProps.blur above), wrapped by its Ken Burns + animate.scale/rotation transform.
   let content: React.ReactNode = (
-    <div style={{ position: "absolute", inset: 0, transform: kenBurnsTransform, transformOrigin: "50% 50%" }}>
+    <div style={{ position: "absolute", inset: 0, transform: elementTransform, transformOrigin: "50% 50%" }}>
       <Primitive {...primitiveProps} />
     </div>
   );
@@ -566,14 +754,18 @@ const BeatSequence: React.FC<{
   outgoingTransition?: TransitionOut;
   incomingTransition?: TransitionOut;
   leadIn: number;
-}> = ({ beat, fps, width, height, beatIndex, outgoingTransition, incomingTransition, leadIn }) => {
+  outgoingOverlap: number;
+}> = ({ beat, fps, width, height, beatIndex, outgoingTransition, incomingTransition, leadIn, outgoingOverlap }) => {
   const seqFrame = useCurrentFrame();
   // seqFrame is local to this Sequence, which starts `leadIn` frames before the beat's "true"
   // start (0 = the moment the previous beat would have hard-cut). Local beat time is therefore
   // shifted back by leadIn during the lead-in window, then proceeds normally.
   const localFrame = seqFrame - leadIn;
 
-  const tailStart = beat.durationInFrames - TRANSITION_FRAMES;
+  // TASK 5 UPGRADE — `outgoingOverlap` (this beat's own `transitionOut.overlapFrames`, already
+  // clamped and matched against the NEXT beat's `leadIn` by the caller, see `Generative`'s
+  // `sequences` computation) replaces the hardcoded `TRANSITION_FRAMES` window width here.
+  const tailStart = beat.durationInFrames - outgoingOverlap;
   const inOverlap = incomingTransition && incomingTransition.kind !== "cut" && seqFrame < leadIn;
   const outOverlap = outgoingTransition && outgoingTransition.kind !== "cut" && localFrame >= tailStart;
 
@@ -628,16 +820,18 @@ export const Generative: React.FC<GenerativeProps> = ({ spec }) => {
   // Compute each beat's "true" start (as if hard-cut back-to-back), then pull each beat's
   // Sequence start earlier by its transition-in overlap (driven by the PREVIOUS beat's
   // transitionOut) so it renders under the previous beat's tail instead of after it — this is
-  // what removes the hard cut. Beats overlap by TRANSITION_FRAMES; the actual overlap used is
-  // also clamped so it never exceeds either beat's own duration (avoids negative Sequence
-  // durations on very short beats).
+  // what removes the hard cut. Beats overlap by `transitionOut.overlapFrames` when the PREVIOUS
+  // beat authored one, else the default TRANSITION_FRAMES window; the actual overlap used is also
+  // clamped so it never exceeds either beat's own duration (avoids negative Sequence durations on
+  // very short beats).
   let trueStart = 0;
   const layout = spec.beats.map((beat, i) => {
     const prevBeat = i > 0 ? spec.beats[i - 1] : undefined;
     const prevTransition = prevBeat?.transitionOut;
     const usesOverlap = prevTransition && prevTransition.kind !== "cut";
+    const overlapWindow = prevTransition?.overlapFrames ?? TRANSITION_FRAMES;
     const overlap = usesOverlap
-      ? Math.max(0, Math.min(TRANSITION_FRAMES, Math.floor(beat.durationInFrames / 2), Math.floor((prevBeat?.durationInFrames ?? 0) / 2)))
+      ? Math.max(0, Math.min(overlapWindow, Math.floor(beat.durationInFrames / 2), Math.floor((prevBeat?.durationInFrames ?? 0) / 2)))
       : 0;
 
     const seqFrom = trueStart - overlap;
@@ -654,20 +848,30 @@ export const Generative: React.FC<GenerativeProps> = ({ spec }) => {
     };
   });
 
-  const sequences = layout.map((entry, i) => (
-    <Sequence key={i} from={entry.from} durationInFrames={entry.durationInFrames}>
-      <BeatSequence
-        beat={entry.beat}
-        fps={fps}
-        width={width}
-        height={height}
-        beatIndex={i}
-        outgoingTransition={entry.outgoingTransition}
-        incomingTransition={entry.incomingTransition}
-        leadIn={entry.leadIn}
-      />
-    </Sequence>
-  ));
+  // Second pass: each beat's OWN tail-overlap width (`outgoingOverlap`, consumed by `BeatSequence`
+  // for its `tailStart` math) is simply the NEXT beat's already-computed `leadIn` — both sides of
+  // one crossfade/wipe MUST share the exact same window width, or the outgoing beat's fade-out and
+  // the incoming beat's fade-in would desync in time. Reading it off the next entry (rather than
+  // recomputing a second clamp from only `beat.durationInFrames`) guarantees they always match,
+  // including the symmetric per-pair clamp against BOTH beats' durations computed above.
+  const sequences = layout.map((entry, i) => {
+    const outgoingOverlap = i + 1 < layout.length ? layout[i + 1].leadIn : 0;
+    return (
+      <Sequence key={i} from={entry.from} durationInFrames={entry.durationInFrames}>
+        <BeatSequence
+          beat={entry.beat}
+          fps={fps}
+          width={width}
+          height={height}
+          beatIndex={i}
+          outgoingTransition={entry.outgoingTransition}
+          incomingTransition={entry.incomingTransition}
+          leadIn={entry.leadIn}
+          outgoingOverlap={outgoingOverlap}
+        />
+      </Sequence>
+    );
+  });
 
   return <AbsoluteFill style={{ backgroundColor: TOKENS.black }}>{sequences}</AbsoluteFill>;
 };

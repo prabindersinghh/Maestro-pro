@@ -5,12 +5,22 @@
 // (`Layer.props` in `src/gen/sceneSpec.ts`), typed loosely here since each primitive interprets
 // its own subset.
 
+import type { EasingSpec } from "./easing";
+
+export interface SpringConfig {
+  damping: number;
+  mass: number;
+  stiffness: number;
+}
+
 export interface EnterSpec {
   anim: "spring" | "typewriter" | "wordReveal" | "kinetic" | "draw" | "fade" | "collapse" | "maskReveal";
-  easing?: "ease-out" | "spring" | "linear";
+  easing?: EasingSpec;
   delay?: number;
   from?: "below" | "left" | "scale";
   snapToBeat?: boolean;
+  durationFrames?: number;
+  spring?: SpringConfig;
 }
 
 export interface StyleSpec {

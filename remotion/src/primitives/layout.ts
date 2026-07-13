@@ -79,14 +79,26 @@ function snapToBaselineGrid(value: number, marginLow: number, marginHigh: number
  * primitive/layer already carries (`dimsForAspect` output) — no separate aspect-string plumbing
  * needed through `BeatContent`/`BeatLayer`. Portrait is detected structurally (`height > width`)
  * rather than re-deriving it from an aspect enum.
+ *
+ * TASK 5 UPGRADE — `snap` (mirrors `Layer.position.snap` in `src/gen/sceneSpec.ts`, default `true`)
+ * lets an authored layer opt OUT of the baseline-grid quantization entirely (e.g. a layer whose
+ * `animate.position` tween needs to land on an exact authored coordinate every frame, not have each
+ * tweened point independently re-snapped to the nearest grid row, which would turn a smooth tween
+ * into a visible staircase). The safe-area clamp is NEVER skipped — `snap:false` only opts out of
+ * the grid rhythm, not out of the "never hug the frame edge" guarantee.
  */
-export function resolveLayoutPosition(position: { x: number; y: number }, width: number, height: number): ResolvedPosition {
+export function resolveLayoutPosition(
+  position: { x: number; y: number },
+  width: number,
+  height: number,
+  snap = true
+): ResolvedPosition {
   const isPortrait = height > width;
   const topMargin = isPortrait ? Math.max(SAFE_MARGIN, PORTRAIT_TOP_EXCLUSION) : SAFE_MARGIN;
   const bottomMargin = isPortrait ? Math.max(SAFE_MARGIN, PORTRAIT_BOTTOM_EXCLUSION) : SAFE_MARGIN;
 
   const x = clampToSafeArea(position.x, SAFE_MARGIN, SAFE_MARGIN);
-  const y = snapToBaselineGrid(position.y, topMargin, bottomMargin);
+  const y = snap ? snapToBaselineGrid(position.y, topMargin, bottomMargin) : clampToSafeArea(position.y, topMargin, bottomMargin);
 
   return { x, y };
 }
