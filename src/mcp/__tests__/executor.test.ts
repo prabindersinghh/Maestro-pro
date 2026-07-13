@@ -101,11 +101,23 @@ describe("Stage-C: stub shapes (SPEC §10/§11)", () => {
 
   it("still-stubbed tools report unavailable (structured, not a crash)", async () => {
     const ex = new McpExecutor();
-    for (const t of ["inspect_timeline", "search_media", "inspect_media"]) {
+    // search_media (semantic/transcript search) remains a stub in this build. inspect_media and
+    // inspect_timeline are now implemented (see inspectTools.test.ts) and no longer belong here.
+    for (const t of ["search_media", "inspect_color"]) {
       const r = await ex.execute(t, {});
       expect(r.isError).toBe(true);
       expect(r.content[0].text).toMatch(/not available in this build/);
     }
+  });
+
+  it("inspect_timeline returns a structured summary (not a stub) on an empty timeline", async () => {
+    const ex = new McpExecutor();
+    const r = await ex.execute("inspect_timeline", {});
+    expect(r.isError).toBeFalsy();
+    const out = JSON.parse(r.content[0].text) as { fps: number; trackCount: number; totalFrames: number };
+    expect(out.fps).toBe(30);
+    expect(out.trackCount).toBe(0);
+    expect(out.totalFrames).toBe(0);
   });
 
   it("transcription tools ask for the whisper setup when the model/binary isn't present", async () => {

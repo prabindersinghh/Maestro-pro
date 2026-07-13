@@ -9,6 +9,7 @@ import { defaultTrack, defaultClip, defaultTextStyle } from "../model/defaults";
 import { LAYOUTS, LAYOUT_NAMES, layoutPlacement, type LayoutFit, type LayoutSlot } from "../model/layout";
 import { EditEngine, type InsertSpec, type MoveSpec, type PlaceSpec } from "../engine/editEngine";
 import { buildGetTimelineOutput } from "./getTimelineOutput";
+import { totalFrames } from "../model/helpers";
 import { MediaLibrary } from "./mediaLibrary";
 import { writeProjectPackage, type PackageFS } from "../project/package";
 import { exportXMEML, exportFCPXML, libraryResolver } from "../export";
@@ -632,9 +633,9 @@ export class McpExecutor {
       // Read
       case "get_timeline": return this.getTimeline(a);
       case "get_media": return okJson({ media: this.media.mediaRows() });
-      case "inspect_media": return this.unavailable("inspect_media", "transcription/frame sampling");
+      case "inspect_media": return this.inspectMedia(a);
       case "get_transcript": return this.getTranscript(a);
-      case "inspect_timeline": return this.unavailable("inspect_timeline", "compositing/render");
+      case "inspect_timeline": return this.inspectTimeline();
       case "search_media": return this.unavailable("search_media", "on-device semantic/transcript search");
       case "inspect_color": return this.unavailable("inspect_color", "compositing/render");
       // Edit
@@ -709,6 +710,84 @@ export class McpExecutor {
       trackLabel: (i) => this.engine.trackDisplayLabel(i),
     });
     return okJson(out);
+  }
+
+  // inspect_media — real container metadata for a media asset via ffprobe (bundled). Given a
+  // mediaRef (or a clipId, resolved to its media), returns width/height/duration/fps/hasAudio/codec
+  // so the AI can reason about actual footage before editing. Metadata-only and honest: frame
+  // sampling / transcription live in their own tools (see_video / get_transcript).
+  private async inspectMedia(a: Args): Promise<ToolResult> {
+    let ref = aStr(a, "mediaRef");
+    const clipId = aStr(a, "clipId");
+    if (!ref && clipId) ref = this.engine.clipRef(clipId)?.mediaRef;
+    if (!ref) return err("inspect_media: provide a mediaRef (or a clipId). Call get_media / get_timeline first to see the ids.");
+    const asset = this.media.asset(ref);
+    if (!asset) return err(`inspect_media: no media found for '${ref}'. Call get_media to list available media.`);
+    const path = resolveRenderMediaPath(asset.source, this.projectDir ?? ".", publicDir());
+    if (!path) return err(`inspect_media: could not resolve a file path for '${ref}'.`);
+    const probe = await probeMedia(path);
+    if (!probe) {
+      return okJson({
+        mediaRef: ref, name: asset.name, type: asset.type,
+        note: "ffprobe returned no metadata (unreadable or unsupported file). Library-recorded fields only:",
+        durationSeconds: asset.duration, width: asset.sourceWidth, height: asset.sourceHeight, fps: asset.sourceFPS, hasAudio: asset.hasAudio,
+      });
+    }
+    return okJson({
+      mediaRef: ref,
+      name: asset.name,
+      type: asset.type,
+      durationSeconds: Number(probe.duration.toFixed(3)),
+      durationFrames: Math.round(probe.duration * this.fps),
+      width: probe.width,
+      height: probe.height,
+      fps: probe.fps ? Number(probe.fps.toFixed(3)) : undefined,
+      aspectRatio: probe.width && probe.height ? Number((probe.width / probe.height).toFixed(4)) : undefined,
+      hasAudio: probe.hasAudio,
+    });
+  }
+
+  // inspect_timeline — a structured, human-readable summary of the CURRENT project timeline straight
+  // from the in-memory engine state (no compositing/render needed): tracks, each clip's placement
+  // (in/out frames + seconds), source media name, speed/volume, and the total duration. Distinct
+  // from get_timeline's compact editing form — this is for "what's on the timeline right now?".
+  private inspectTimeline(): ToolResult {
+    const total = totalFrames(this.timeline.tracks);
+    const tracks = this.timeline.tracks.map((t, ti) => ({
+      index: ti,
+      label: this.engine.trackDisplayLabel(ti),
+      type: t.type,
+      muted: t.muted,
+      hidden: t.hidden,
+      clipCount: t.clips.length,
+      clips: t.clips.map((c) => {
+        const asset = this.media.asset(c.mediaRef);
+        const outFrame = c.startFrame + c.durationFrames;
+        return {
+          id: c.id,
+          media: asset?.name ?? c.mediaRef,
+          mediaRef: c.mediaRef,
+          type: c.mediaType,
+          startFrame: c.startFrame,
+          endFrame: outFrame,
+          durationFrames: c.durationFrames,
+          startSec: Number((c.startFrame / this.fps).toFixed(2)),
+          endSec: Number((outFrame / this.fps).toFixed(2)),
+          speed: c.speed !== 1 ? c.speed : undefined,
+          volume: c.volume !== 1 ? c.volume : undefined,
+          text: c.textContent,
+        };
+      }),
+    }));
+    return okJson({
+      fps: this.fps,
+      width: this.timeline.width,
+      height: this.timeline.height,
+      totalFrames: total,
+      totalSeconds: Number((total / this.fps).toFixed(2)),
+      trackCount: this.timeline.tracks.length,
+      tracks,
+    });
   }
 
   // ---- Edit ----

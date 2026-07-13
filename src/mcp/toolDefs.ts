@@ -76,17 +76,11 @@ export const TOOL_DEFS: ToolDef[] = [
   {
     name: "inspect_media",
     description:
-      "Look at a media asset before referencing it. Images: dimensions + EXIF. Video: sample frames + audio transcription. Audio: transcription. Lottie: sampled frames. (Transcription runs on-device.)",
+      "Container metadata for a media asset via ffprobe: width, height, duration (seconds + frames), fps, aspect ratio, and whether it has audio. Use before referencing footage to know its real dimensions/length. For what's ON the frames use see_video; for spoken words use get_transcript.",
     inputSchema: obj(
       {
         mediaRef: str("Asset ID from get_media."),
-        clipId: str("Optional. A clip referencing this mediaRef; transcript times come back as project frames."),
-        maxFrames: int("Video/Lottie. Sample frame count (default 6, max 12)."),
-        startSeconds: num("Video/audio. Source-time window start."),
-        endSeconds: num("Video/audio. Window end."),
-        wordTimestamps: bool("Video/audio. Add word-level [text, start, end] tuples."),
-        overview: bool("Video only. One storyboard grid of distinct moments."),
-        language: str("Optional BCP-47 language tag of the spoken audio."),
+        clipId: str("Optional. Inspect the media underlying this clip instead of passing a mediaRef."),
       },
       ["mediaRef"],
     ),
@@ -105,12 +99,8 @@ export const TOOL_DEFS: ToolDef[] = [
   {
     name: "inspect_timeline",
     description:
-      "See the composited timeline — what the user sees in the preview at a frame: all video tracks stacked with transforms/opacity/crop/keyframes, plus text and caption overlays. Use to verify edits landed.",
-    inputSchema: obj({
-      startFrame: int("Project frame to render (default 0)."),
-      endFrame: int("Optional. Sample maxFrames evenly across [startFrame, endFrame)."),
-      maxFrames: int("Frames to sample when endFrame is set (default 6, max 12)."),
-    }),
+      "A structured summary of what's on the timeline RIGHT NOW: project fps/size, total duration, and per track every clip with its media name, in/out (frames + seconds), speed, volume, and text. Read it to verify edits landed. (For a composited pixel preview, render/export.)",
+    inputSchema: obj({}),
   },
   {
     name: "search_media",
