@@ -6,6 +6,9 @@ import { DataViz } from "./compositions/DataViz";
 import { Transition } from "./compositions/Transition";
 import { HeroDemo } from "./compositions/HeroDemo";
 import { CondenseReel } from "./compositions/CondenseReel";
+import { FilmLaunch } from "./compositions/FilmLaunch";
+import { FilmSaaS } from "./compositions/FilmSaaS";
+import { FilmData } from "./compositions/FilmData";
 import { Generative, totalDuration, dimsForAspect, type GenerativeProps } from "./compositions/Generative";
 
 const FPS = 30;
@@ -63,6 +66,22 @@ export const RemotionRoot: React.FC = () => (
     <Composition
       id="CondenseReel" component={CondenseReel} fps={FPS} width={1080} height={1920} durationInFrames={300}
       defaultProps={{ accent: "#16b16a", durationSeconds: 10 }}
+      calculateMetadata={dur}
+    />
+    {/* Bespoke hand-authored films (Task 10 final): raw Remotion, no preset system. */}
+    <Composition
+      id="FilmLaunch" component={FilmLaunch} fps={FPS} width={W} height={H} durationInFrames={390}
+      defaultProps={{ durationSeconds: 13 }}
+      calculateMetadata={dur}
+    />
+    <Composition
+      id="FilmSaaS" component={FilmSaaS} fps={FPS} width={W} height={H} durationInFrames={420}
+      defaultProps={{ durationSeconds: 14 }}
+      calculateMetadata={dur}
+    />
+    <Composition
+      id="FilmData" component={FilmData} fps={FPS} width={1080} height={1920} durationInFrames={372}
+      defaultProps={{ durationSeconds: 12.4 }}
       calculateMetadata={dur}
     />
     <Composition
