@@ -137,10 +137,15 @@ export interface LightingSweep {
   speed: number;
 }
 
+export interface Hold {
+  startFrame: number;
+  durationFrames: number;
+}
+
 export interface Layer {
   element: (typeof ELEMENTS)[number];
   props: Record<string, unknown>;
-  position: { x: number; y: number };
+  position: { x: number; y: number; snap: boolean };
   opacity: number;
   blur: number;
   depth: "foreground" | "mid" | "background";
@@ -151,6 +156,7 @@ export interface Layer {
   enter?: Enter;
   exit?: Exit;
   style?: LayerStyle;
+  hold?: Hold;
 }
 
 export interface Beat {
@@ -239,7 +245,7 @@ function checkUnknownKeys(obj: Record<string, unknown>, known: readonly string[]
 // Nested validators — each returns a fully-defaulted, clamped object or throws ValidationError.
 // ---------------------------------------------------------------------------
 
-const POSITION_KEYS = ["x", "y"] as const;
+const POSITION_KEYS = ["x", "y", "snap"] as const;
 const CAMERA_KEYS = ["move", "amount"] as const;
 const BACKGROUND_KEYS = ["kind", "accent"] as const;
 const TRANSITION_OUT_KEYS = ["kind", "accent", "snapToBeat", "overlapFrames", "easing"] as const;
@@ -250,15 +256,18 @@ const ENTER_KEYS = ["anim", "easing", "delay", "from", "snapToBeat", "durationFr
 const EXIT_KEYS = ["anim", "at", "easing", "durationFrames"] as const;
 const SPRING_CONFIG_KEYS = ["damping", "mass", "stiffness"] as const;
 const STYLE_KEYS = ["role", "size"] as const;
+const HOLD_KEYS = ["startFrame", "durationFrames"] as const;
 
-function validatePosition(value: unknown, path: string): { x: number; y: number } {
-  if (value === undefined) return { x: 0.5, y: 0.5 };
+function validatePosition(value: unknown, path: string): { x: number; y: number; snap: boolean } {
+  if (value === undefined) return { x: 0.5, y: 0.5, snap: true };
   if (!isPlainObject(value)) fail(path, "must be an object {x,y}");
   const obj = value as Record<string, unknown>;
   checkUnknownKeys(obj, POSITION_KEYS, path);
+  const snap = obj.snap === undefined ? true : Boolean(obj.snap);
   return {
     x: clamp(obj.x, 0, 1, 0.5),
     y: clamp(obj.y, 0, 1, 0.5),
+    snap,
   };
 }
 
@@ -389,6 +398,16 @@ function validateStyle(value: unknown, path: string): LayerStyle | undefined {
   return { role, size };
 }
 
+function validateHold(value: unknown, path: string): Hold | undefined {
+  if (value === undefined) return undefined;
+  if (!isPlainObject(value)) fail(path, "must be an object");
+  const obj = value as Record<string, unknown>;
+  checkUnknownKeys(obj, HOLD_KEYS, path);
+  const startFrame = clamp(obj.startFrame, 0, 600, 0);
+  const durationFrames = clamp(obj.durationFrames, 0, 600, 0);
+  return { startFrame, durationFrames };
+}
+
 /**
  * Validates an `EasingSpec`: either a preset string (one of `EASINGS`) or an explicit
  * `{curve:[x1,y1,x2,y2]}` cubic-bezier. Unlike most numeric fields in this file, a malformed curve
@@ -415,7 +434,7 @@ export function validateEasing(value: unknown, path: string): EasingSpec {
 
 const LAYER_KEYS = [
   "element", "props", "position", "opacity", "blur", "depth", "mask", "motionBlur",
-  "kenBurns", "lightingSweep", "enter", "exit", "style",
+  "kenBurns", "lightingSweep", "enter", "exit", "style", "hold",
 ] as const;
 
 // Elements whose `props.src` names a real on-disk media file — these are the ones the media-path
@@ -477,6 +496,7 @@ function validateLayer(value: unknown, path: string, opts: ValidateOpts | undefi
   const enter = validateEnter(obj.enter, `${path}.enter`);
   const exit = validateExit(obj.exit, `${path}.exit`);
   const style = validateStyle(obj.style, `${path}.style`);
+  const hold = validateHold(obj.hold, `${path}.hold`);
 
   const layer: Layer = {
     element,
@@ -493,6 +513,7 @@ function validateLayer(value: unknown, path: string, opts: ValidateOpts | undefi
   if (enter !== undefined) layer.enter = enter;
   if (exit !== undefined) layer.exit = exit;
   if (style !== undefined) layer.style = style;
+  if (hold !== undefined) layer.hold = hold;
 
   return layer;
 }

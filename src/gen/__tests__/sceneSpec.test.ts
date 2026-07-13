@@ -170,5 +170,17 @@ describe("validateSceneSpec", () => {
       expect(r.ok).toBe(false);
       if (!r.ok) expect(r.error).toMatch(/enter/);
     });
+
+    it("layer accepts explicit hold {startFrame,durationFrames} clamped", () => {
+      const r = validateSceneSpec(specWith({ hold: { startFrame: 20, durationFrames: 45 } }));
+      expect(r.ok).toBe(true);
+      if (r.ok) expect(r.spec.beats[0].layers[0].hold).toEqual({ startFrame: 20, durationFrames: 45 });
+    });
+    it("position.snap defaults true and can be set false", () => {
+      const a = validateSceneSpec(specWith({ position: { x: 0.28, y: 0.4 } }));
+      const b = validateSceneSpec(specWith({ position: { x: 0.28, y: 0.4, snap: false } }));
+      expect(a.ok && a.spec.beats[0].layers[0].position.snap).toBe(true);
+      expect(b.ok && b.spec.beats[0].layers[0].position.snap).toBe(false);
+    });
   });
 });
