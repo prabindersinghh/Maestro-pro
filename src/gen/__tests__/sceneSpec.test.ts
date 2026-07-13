@@ -182,5 +182,28 @@ describe("validateSceneSpec", () => {
       expect(a.ok && a.spec.beats[0].layers[0].position.snap).toBe(true);
       expect(b.ok && b.spec.beats[0].layers[0].position.snap).toBe(false);
     });
+
+    it("accepts a per-property animate block (opacity + position on their own curves)", () => {
+      const r = validateSceneSpec(specWith({
+        animate: {
+          opacity: { from: 0, to: 1, startFrame: 0, durationFrames: 16, easing: "ease-out" },
+          position: { from: { x: 0.3, y: 0.5 }, to: { x: 0.5, y: 0.5 }, startFrame: 4, durationFrames: 20, easing: { curve: [0.2, 0.8, 0.2, 1] } },
+        },
+      }));
+      expect(r.ok).toBe(true);
+    });
+    it("REJECTS animate.opacity + enter.anim:fade with a message naming both", () => {
+      const r = validateSceneSpec(specWith({
+        enter: { anim: "fade" },
+        animate: { opacity: { from: 0, to: 1, startFrame: 0, durationFrames: 12, easing: "linear" } },
+      }));
+      expect(r.ok).toBe(false);
+      if (!r.ok) { expect(r.error).toMatch(/animate\.opacity/); expect(r.error).toMatch(/enter/); }
+    });
+    it("REJECTS an unknown animate property key", () => {
+      const r = validateSceneSpec(specWith({ animate: { skew: { from: 0, to: 1, startFrame: 0, durationFrames: 8, easing: "linear" } } }));
+      expect(r.ok).toBe(false);
+      if (!r.ok) expect(r.error).toMatch(/animate/);
+    });
   });
 });

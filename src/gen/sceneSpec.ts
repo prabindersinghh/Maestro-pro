@@ -142,6 +142,38 @@ export interface Hold {
   durationFrames: number;
 }
 
+/**
+ * A single scalar property's independent keyframe curve: linear interpolation from `from` to `to`
+ * over `[startFrame, startFrame+durationFrames)`, shaped by `easing`. Used for opacity/scale/blur/
+ * rotation under `Layer.animate` — the per-property escape hatch for motion that `enter`/`exit`
+ * (whole-layer, single-curve) can't express, e.g. an opacity fade on a different timeline than the
+ * layer's entrance.
+ */
+export interface Tween {
+  from: number;
+  to: number;
+  startFrame: number;
+  durationFrames: number;
+  easing: EasingSpec;
+}
+
+/** Same shape as `Tween` but for the 2D `position` property: `from`/`to` are `{x,y}` points. */
+export interface PositionTween {
+  from: { x: number; y: number };
+  to: { x: number; y: number };
+  startFrame: number;
+  durationFrames: number;
+  easing: EasingSpec;
+}
+
+export interface Animate {
+  position?: PositionTween;
+  opacity?: Tween;
+  scale?: Tween;
+  blur?: Tween;
+  rotation?: Tween;
+}
+
 export interface Layer {
   element: (typeof ELEMENTS)[number];
   props: Record<string, unknown>;
@@ -157,6 +189,7 @@ export interface Layer {
   exit?: Exit;
   style?: LayerStyle;
   hold?: Hold;
+  animate?: Animate;
 }
 
 export interface Beat {
@@ -257,6 +290,19 @@ const EXIT_KEYS = ["anim", "at", "easing", "durationFrames"] as const;
 const SPRING_CONFIG_KEYS = ["damping", "mass", "stiffness"] as const;
 const STYLE_KEYS = ["role", "size"] as const;
 const HOLD_KEYS = ["startFrame", "durationFrames"] as const;
+const ANIMATE_KEYS = ["position", "opacity", "scale", "blur", "rotation"] as const;
+const TWEEN_KEYS = ["from", "to", "startFrame", "durationFrames", "easing"] as const;
+const POSITION_TWEEN_POINT_KEYS = ["x", "y"] as const;
+
+// Per-property clamp range for each scalar tween kind under `animate` — mirrors the corresponding
+// static field's own range (opacity/blur match `Layer.opacity`/`Layer.blur`; scale/rotation have no
+// static counterpart on `Layer` so their ranges are set generously per the design spec).
+const TWEEN_RANGES: Record<"opacity" | "scale" | "blur" | "rotation", [number, number]> = {
+  opacity: [0, 1],
+  scale: [0, 8],
+  blur: [0, 64],
+  rotation: [-720, 720],
+};
 
 function validatePosition(value: unknown, path: string): { x: number; y: number; snap: boolean } {
   if (value === undefined) return { x: 0.5, y: 0.5, snap: true };
@@ -409,6 +455,93 @@ function validateHold(value: unknown, path: string): Hold | undefined {
 }
 
 /**
+ * Validates one scalar tween (`opacity`|`scale`|`blur`|`rotation` under `animate`). Unlike most
+ * numeric fields in this file, `from`/`to` are checked for finiteness and fail loud rather than
+ * silently defaulting — a missing/garbled tween endpoint is a structural error in the agent's
+ * output (there's no sane default "from" value), not a tuning knob to clamp away. Once finiteness
+ * is confirmed, the value is clamped into the property's own range (see `TWEEN_RANGES`) same as
+ * every other numeric field.
+ */
+function validateTween(value: unknown, path: string, range: [number, number]): Tween {
+  if (!isPlainObject(value)) fail(path, "must be an object {from,to,startFrame,durationFrames,easing}");
+  const obj = value as Record<string, unknown>;
+  checkUnknownKeys(obj, TWEEN_KEYS, path);
+  if (typeof obj.from !== "number" || !Number.isFinite(obj.from)) {
+    fail(`${path}.from`, `must be a finite number, got '${String(obj.from)}'`);
+  }
+  if (typeof obj.to !== "number" || !Number.isFinite(obj.to)) {
+    fail(`${path}.to`, `must be a finite number, got '${String(obj.to)}'`);
+  }
+  const [min, max] = range;
+  const from = clamp(obj.from, min, max, min);
+  const to = clamp(obj.to, min, max, max);
+  const startFrame = clamp(obj.startFrame, 0, 600, 0);
+  const durationFrames = clamp(obj.durationFrames, 0, 600, 30);
+  const easing = validateEasing(obj.easing, `${path}.easing`);
+  return { from, to, startFrame, durationFrames, easing };
+}
+
+/** Validates a single `{x,y}` point for `PositionTween.from`/`.to`, clamped 0..1 per axis. */
+function validatePositionTweenPoint(value: unknown, path: string): { x: number; y: number } {
+  if (!isPlainObject(value)) fail(path, "must be an object {x,y}");
+  const obj = value as Record<string, unknown>;
+  checkUnknownKeys(obj, POSITION_TWEEN_POINT_KEYS, path);
+  if (typeof obj.x !== "number" || !Number.isFinite(obj.x)) {
+    fail(`${path}.x`, `must be a finite number, got '${String(obj.x)}'`);
+  }
+  if (typeof obj.y !== "number" || !Number.isFinite(obj.y)) {
+    fail(`${path}.y`, `must be a finite number, got '${String(obj.y)}'`);
+  }
+  return { x: clamp(obj.x, 0, 1, 0.5), y: clamp(obj.y, 0, 1, 0.5) };
+}
+
+/** Validates `animate.position`: a `PositionTween` whose `from`/`to` are `{x,y}` points (0..1 per axis). */
+function validatePositionTween(value: unknown, path: string): PositionTween {
+  if (!isPlainObject(value)) fail(path, "must be an object {from,to,startFrame,durationFrames,easing}");
+  const obj = value as Record<string, unknown>;
+  checkUnknownKeys(obj, TWEEN_KEYS, path);
+  const from = validatePositionTweenPoint(obj.from, `${path}.from`);
+  const to = validatePositionTweenPoint(obj.to, `${path}.to`);
+  const startFrame = clamp(obj.startFrame, 0, 600, 0);
+  const durationFrames = clamp(obj.durationFrames, 0, 600, 30);
+  const easing = validateEasing(obj.easing, `${path}.easing`);
+  return { from, to, startFrame, durationFrames, easing };
+}
+
+/**
+ * Validates `Layer.animate`: a bag of independent per-property tweens (`position`/`opacity`/
+ * `scale`/`blur`/`rotation`), each on its own timeline — the escape hatch for motion that
+ * `enter`/`exit` (whole-layer, single-curve) can't express. Presence of a conflicting `enter`/
+ * `exit` animation on the *same* property is NOT checked here (this function only validates
+ * shape/ranges) — that cross-field fail-loud check lives in `validateLayer`, after both `animate`
+ * and `enter`/`exit` have been parsed, so it can inspect all three together.
+ */
+function validateAnimate(value: unknown, path: string): Animate | undefined {
+  if (value === undefined) return undefined;
+  if (!isPlainObject(value)) fail(path, "must be an object");
+  const obj = value as Record<string, unknown>;
+  checkUnknownKeys(obj, ANIMATE_KEYS, path);
+
+  const animate: Animate = {};
+  if (obj.position !== undefined) {
+    animate.position = validatePositionTween(obj.position, `${path}.position`);
+  }
+  if (obj.opacity !== undefined) {
+    animate.opacity = validateTween(obj.opacity, `${path}.opacity`, TWEEN_RANGES.opacity);
+  }
+  if (obj.scale !== undefined) {
+    animate.scale = validateTween(obj.scale, `${path}.scale`, TWEEN_RANGES.scale);
+  }
+  if (obj.blur !== undefined) {
+    animate.blur = validateTween(obj.blur, `${path}.blur`, TWEEN_RANGES.blur);
+  }
+  if (obj.rotation !== undefined) {
+    animate.rotation = validateTween(obj.rotation, `${path}.rotation`, TWEEN_RANGES.rotation);
+  }
+  return animate;
+}
+
+/**
  * Validates an `EasingSpec`: either a preset string (one of `EASINGS`) or an explicit
  * `{curve:[x1,y1,x2,y2]}` cubic-bezier. Unlike most numeric fields in this file, a malformed curve
  * is a loud failure rather than a silent-substituted default — `clamp`'s NaN-to-default fallback
@@ -434,7 +567,7 @@ export function validateEasing(value: unknown, path: string): EasingSpec {
 
 const LAYER_KEYS = [
   "element", "props", "position", "opacity", "blur", "depth", "mask", "motionBlur",
-  "kenBurns", "lightingSweep", "enter", "exit", "style", "hold",
+  "kenBurns", "lightingSweep", "enter", "exit", "style", "hold", "animate",
 ] as const;
 
 // Elements whose `props.src` names a real on-disk media file — these are the ones the media-path
@@ -473,6 +606,51 @@ export interface ValidateOpts {
   allowedMediaPaths?: string[];
 }
 
+/**
+ * Fail-loud conflict guard: rejects a layer whose `animate` block drives a property that
+ * `enter`/`exit` ALSO drives, since the interpreter would otherwise have to silently pick a
+ * winner (last-write-wins or some other implicit precedence) — exactly the silent-substitute
+ * behavior this validator exists to prevent. Must run after `animate`/`enter`/`exit` are all
+ * parsed so it can inspect the fully-validated `enter.anim`/`exit.anim` together with `animate`'s
+ * validated presence.
+ *
+ * The `enter.from` check is the one exception that needs the *raw* (pre-validation) `enter`
+ * object rather than the validated one: `validateEnter` fills in a default `from:"below"` when
+ * the agent didn't specify one, so checking the validated `enter.from` would treat every layer
+ * with *any* enter animation as conflicting with `animate.position` — including ones that never
+ * asked for a `from`-driven slide-in. Checking raw presence (`rawEnter.from !== undefined`)
+ * conflicts only when the agent explicitly opted into an enter *position* animation.
+ */
+function checkAnimateConflicts(
+  animate: Animate | undefined,
+  enter: Enter | undefined,
+  exit: Exit | undefined,
+  rawEnter: unknown,
+  path: string
+): void {
+  if (animate?.opacity !== undefined) {
+    const enterDrivesOpacity = enter?.anim === "fade" || enter?.anim === "spring";
+    const exitDrivesOpacity = exit?.anim === "fade";
+    if (enterDrivesOpacity || exitDrivesOpacity) {
+      const culprit = enterDrivesOpacity ? `enter.anim:"${enter!.anim}"` : `exit.anim:"fade"`;
+      fail(path, `animate.opacity conflicts with ${culprit} — both drive opacity; keep one`);
+    }
+  }
+
+  if (animate?.position !== undefined) {
+    const rawFrom = isPlainObject(rawEnter) ? rawEnter.from : undefined;
+    if (rawFrom !== undefined) {
+      fail(path, `animate.position conflicts with enter.from:"${String(rawFrom)}" — both drive position; keep one`);
+    }
+  }
+
+  if (animate?.scale !== undefined) {
+    if (enter?.anim === "kinetic") {
+      fail(path, `animate.scale conflicts with enter.anim:"kinetic" — both drive scale; keep one`);
+    }
+  }
+}
+
 function validateLayer(value: unknown, path: string, opts: ValidateOpts | undefined): Layer {
   if (!isPlainObject(value)) fail(path, "must be an object");
   const obj = value as Record<string, unknown>;
@@ -497,6 +675,9 @@ function validateLayer(value: unknown, path: string, opts: ValidateOpts | undefi
   const exit = validateExit(obj.exit, `${path}.exit`);
   const style = validateStyle(obj.style, `${path}.style`);
   const hold = validateHold(obj.hold, `${path}.hold`);
+  const animate = validateAnimate(obj.animate, `${path}.animate`);
+
+  checkAnimateConflicts(animate, enter, exit, obj.enter, path);
 
   const layer: Layer = {
     element,
@@ -514,6 +695,7 @@ function validateLayer(value: unknown, path: string, opts: ValidateOpts | undefi
   if (exit !== undefined) layer.exit = exit;
   if (style !== undefined) layer.style = style;
   if (hold !== undefined) layer.hold = hold;
+  if (animate !== undefined) layer.animate = animate;
 
   return layer;
 }
