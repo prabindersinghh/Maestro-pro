@@ -382,18 +382,32 @@ export const TOOL_DEFS: ToolDef[] = [
   {
     name: "add_captions",
     description:
-      "Transcribes spoken audio and creates styled caption text clips. Omit clipIds to caption the timeline's main spoken audio. Per-word animations are timed from transcript.",
+      "Transcribes a spoken clip's audio (on-device) and creates word-timed caption text clips on a text track (placed at centerX 0.5 / centerY 0.8). Omit clipId to caption the clip from your most recent get_transcript. Words are grouped into short captions and each caption's on-screen window is timed from the transcript; per-word reveal/highlight is driven by textAnimation.",
     inputSchema: obj({
-      clipIds: arr(str(), "Optional. Scope captioning to these audio/video clips."),
-      language: str("BCP-47 speech language."),
-      centerX: num("0-1 horizontal center."),
-      centerY: num("0-1 vertical center."),
-      textCase: enumStr(["auto", "upper", "lower"], "Letter case."),
-      censorProfanity: bool("Mask profanity."),
-      maxWords: int("Max words per caption."),
-      ...textStyleProps,
-      animation: enumStr(ANIMATION_VALUES, "Caption animation preset."),
-      highlightColor: str("Active-word hex."),
+      clipId: str("The spoken audio/video clip to caption. Omit to use the clip from your last get_transcript call."),
+      wordsPerCaption: int("Words grouped into each caption clip (1–8, default 3)."),
+      language: str("Optional BCP-47 speech language tag of the audio."),
+      textStyle: obj(
+        {
+          fontName: str("Font family name."),
+          fontSize: num("Font size in canvas points."),
+          isBold: bool("Bold."),
+          isItalic: bool("Italic."),
+          color: str("Text color as #rrggbb hex."),
+          alignment: enumStr(["left", "center", "right"], "Text alignment."),
+          borderColor: str("Outline color hex (enables an outline)."),
+          backgroundColor: str("Caption box fill hex (enables a filled box)."),
+        },
+        [],
+      ),
+      textAnimation: obj(
+        {
+          preset: enumStr(ANIMATION_VALUES, "Per-caption animation preset (default wordReveal)."),
+          perWordFrames: int("Frames each word takes to reveal/advance (default 6)."),
+          highlight: str("Active-word highlight color as #rrggbb hex (karaoke-style)."),
+        },
+        [],
+      ),
     }),
   },
 
