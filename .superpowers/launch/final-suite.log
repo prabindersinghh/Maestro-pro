@@ -1,0 +1,96 @@
+
+[1m[7m[36m RUN [39m[27m[22m [36mv2.1.9 [39m[90mC:/Users/prabi/Downloads/palmier-pro-main (2)/palmier-win[39m
+
+ [32m✓[39m src/gen/__tests__/sceneSpec.test.ts [2m([22m[2m38 tests[22m[2m)[22m[90m 41[2mms[22m[39m
+ [32m✓[39m src/model/__tests__/helpers.test.ts [2m([22m[2m12 tests[22m[2m)[22m[90m 19[2mms[22m[39m
+ [32m✓[39m src/engine/__tests__/editEngine.test.ts [2m([22m[2m17 tests[22m[2m)[22m[90m 43[2mms[22m[39m
+ [32m✓[39m src/export/__tests__/interchange.test.ts [2m([22m[2m13 tests[22m[2m)[22m[90m 36[2mms[22m[39m
+ [32m✓[39m src/mcp/__tests__/executor.test.ts [2m([22m[2m11 tests[22m[2m)[22m[90m 83[2mms[22m[39m
+ [32m✓[39m src/mcp/__tests__/server.test.ts [2m([22m[2m11 tests[22m[2m)[22m[33m 323[2mms[22m[39m
+ [32m✓[39m src/engine/__tests__/transitions.test.ts [2m([22m[2m7 tests[22m[2m)[22m[90m 16[2mms[22m[39m
+ [32m✓[39m src/model/__tests__/serialize-rule.test.ts [2m([22m[2m6 tests[22m[2m)[22m[90m 16[2mms[22m[39m
+ [32m✓[39m src/mcp/__tests__/stdio.test.ts [2m([22m[2m5 tests[22m[2m)[22m[33m 586[2mms[22m[39m
+ [32m✓[39m src/render/__tests__/audioMix.test.ts [2m([22m[2m10 tests[22m[2m)[22m[90m 18[2mms[22m[39m
+ [32m✓[39m src/model/__tests__/roundtrip.test.ts [2m([22m[2m5 tests[22m[2m)[22m[90m 108[2mms[22m[39m
+ [32m✓[39m src/mcp/__tests__/viralReelWorkflow.test.ts [2m([22m[2m1 test[22m[2m)[22m[33m 2176[2mms[22m[39m
+   [33m[2m✓[22m[39m viral-reel workflow (agent runs the skill's tool-chain on real footage)[2m > [22mreframes 9:16, cuts the pause, adds a hook + zoom punch + palette grade [33m1333[2mms[22m[39m
+ [32m✓[39m src/mcp/__tests__/inspectTools.test.ts [2m([22m[2m4 tests[22m[2m)[22m[33m 1445[2mms[22m[39m
+   [33m[2m✓[22m[39m inspect_media (ffprobe metadata)[2m > [22mreturns real width/height/duration/fps/hasAudio for an imported clip [33m378[2mms[22m[39m
+ [32m✓[39m src/model/__tests__/effectStack.test.ts [2m([22m[2m8 tests[22m[2m)[22m[90m 17[2mms[22m[39m
+ [32m✓[39m src/gen/__tests__/gcp.test.ts [2m([22m[2m5 tests[22m[2m)[22m[90m 15[2mms[22m[39m
+ [32m✓[39m src/compositor/__tests__/frameState.test.ts [2m([22m[2m7 tests[22m[2m)[22m[90m 16[2mms[22m[39m
+ [32m✓[39m src/gen/__tests__/pacing.test.ts [2m([22m[2m5 tests[22m[2m)[22m[90m 9[2mms[22m[39m
+ [32m✓[39m src/state/__tests__/store.test.ts [2m([22m[2m6 tests[22m[2m)[22m[90m 21[2mms[22m[39m
+ [32m✓[39m src/ui/timeline/__tests__/snap.test.ts [2m([22m[2m6 tests[22m[2m)[22m[90m 20[2mms[22m[39m
+ [32m✓[39m src/mcp/__tests__/analysisTools.test.ts [2m([22m[2m3 tests[22m[2m)[22m[33m 2746[2mms[22m[39m
+   [33m[2m✓[22m[39m analyze_audio + extract_palette MCP tools (end-to-end via executor)[2m > [22manalyze_audio returns beats/onsets/tempo in project frames [33m660[2mms[22m[39m
+   [33m[2m✓[22m[39m analyze_audio + extract_palette MCP tools (end-to-end via executor)[2m > [22mextract_palette returns weighted hex swatches (red + blue) [33m620[2mms[22m[39m
+ [32m✓[39m src/engine/__tests__/ripple.test.ts [2m([22m[2m7 tests[22m[2m)[22m[90m 19[2mms[22m[39m
+ [32m✓[39m src/render/__tests__/realpixels.test.ts [2m([22m[2m1 test[22m[2m)[22m[33m 9200[2mms[22m[39m
+   [33m[2m✓[22m[39m REAL decoded pixels in the FFmpeg render (import mp4/png → export shows footage)[2m > [22mrenders true source pixels: red early, green late (frame-accurate), cyan image PIP [33m6627[2mms[22m[39m
+ [32m✓[39m src/render/__tests__/transitionRender.test.ts [2m([22m[2m1 test[22m[2m)[22m[33m 10473[2mms[22m[39m
+   [33m[2m✓[22m[39m cross-dissolve renders as a real blend in the FFmpeg export[2m > [22mblends red and green at the transition midpoint [33m9390[2mms[22m[39m
+ [32m✓[39m src/gen/__tests__/gcpLtx.test.ts [2m([22m[2m4 tests[22m[2m)[22m[33m 11074[2mms[22m[39m
+   [33m[2m✓[22m[39m gcp-ltx generation provider[2m > [22msubmits, polls, and returns the result URL (with bearer auth) [33m5157[2mms[22m[39m
+   [33m[2m✓[22m[39m gcp-ltx generation provider[2m > [22mend-to-end: generate_video via executor downloads the clip and places it on the timeline [33m5337[2mms[22m[39m
+ [32m✓[39m src/export/__tests__/timecode.test.ts [2m([22m[2m7 tests[22m[2m)[22m[90m 11[2mms[22m[39m
+ [32m✓[39m src/ui/timeline/__tests__/geometry.test.ts [2m([22m[2m5 tests[22m[2m)[22m[90m 10[2mms[22m[39m
+ [32m✓[39m src/gen/__tests__/resourcesRemotion.test.ts [2m([22m[2m3 tests[22m[2m)[22m[90m 8[2mms[22m[39m
+ [32m✓[39m src/render/__tests__/render.test.ts [2m([22m[2m2 tests[22m[2m)[22m[33m 1385[2mms[22m[39m
+   [33m[2m✓[22m[39m renderVideo → real playable file (FFmpeg finish line)[2m > [22mrenders composited frames and encodes an H.264 mp4 ffprobe can read [33m1376[2mms[22m[39m
+ [32m✓[39m src/audio/__tests__/beats.test.ts [2m([22m[2m3 tests[22m[2m)[22m[33m 2032[2mms[22m[39m
+   [33m[2m✓[22m[39m beat/onset detection (our own FFmpeg-based analyzer)[2m > [22mfinds ~one onset per 0.5s beat and a tempo near 120 BPM [33m369[2mms[22m[39m
+ [32m✓[39m src/vision/__tests__/frames.test.ts [2m([22m[2m3 tests[22m[2m)[22m[33m 8086[2mms[22m[39m
+   [33m[2m✓[22m[39m video vision — extractFrames[2m > [22mreturns base64 JPEG frames with timestamps (interval) [33m4036[2mms[22m[39m
+   [33m[2m✓[22m[39m video vision — extractFrames[2m > [22mscene mode finds the color change [33m455[2mms[22m[39m
+   [33m[2m✓[22m[39m see_video MCP tool returns viewable image blocks[2m > [22memits an image content block per frame [33m2530[2mms[22m[39m
+ [32m✓[39m src/mcp/__tests__/skills.test.ts [2m([22m[2m4 tests[22m[2m)[22m[90m 36[2mms[22m[39m
+ [32m✓[39m src/audio/__tests__/transcribe.test.ts [2m([22m[2m3 tests[22m[2m)[22m[90m 10[2mms[22m[39m
+[90mstdout[2m | src/ui/__tests__/genHidden.test.tsx[2m > [22m[2mgeneration UI is hidden by default (paid-tier feature)[2m > [22m[2mdefaults to OFF
+[22m[39m[kaestral] generation dev mode disabled — no generation UI.
+
+[90mstdout[2m | src/ui/__tests__/genHidden.test.tsx[2m > [22m[2mgeneration UI is hidden by default (paid-tier feature)[2m > [22m[2mthe Media panel shows NO Generate button by default
+[22m[39m[kaestral] generation dev mode disabled — no generation UI.
+
+[90mstdout[2m | src/ui/__tests__/genHidden.test.tsx[2m > [22m[2mgeneration UI is hidden by default (paid-tier feature)[2m > [22m[2mthe Generation panel renders nothing by default
+[22m[39m[kaestral] generation dev mode disabled — no generation UI.
+
+[90mstdout[2m | src/ui/__tests__/genHidden.test.tsx[2m > [22m[2mgeneration UI is hidden by default (paid-tier feature)[2m > [22m[2mopenGenerate is a no-op unless the dev flag is on
+[22m[39m[kaestral] generation dev mode disabled — no generation UI.
+
+[90mstdout[2m | src/ui/__tests__/genHidden.test.tsx[2m > [22m[2mgeneration UI is hidden by default (paid-tier feature)[2m > [22m[2menabling the hidden dev flag reveals the Generate button (for internal testing)
+[22m[39m[kaestral] generation dev mode disabled — no generation UI.
+[kaestral] generation dev mode ENABLED — Generate button now visible in Media panel.
+[kaestral] generation dev mode disabled — no generation UI.
+
+ [32m✓[39m src/ui/__tests__/genHidden.test.tsx [2m([22m[2m5 tests[22m[2m)[22m[90m 31[2mms[22m[39m
+ [32m✓[39m src/gen/__tests__/hosted.test.ts [2m([22m[2m5 tests[22m[2m)[22m[90m 14[2mms[22m[39m
+ [32m✓[39m src/mcp/__tests__/artDirectionSkill.test.ts [2m([22m[2m4 tests[22m[2m)[22m[90m 13[2mms[22m[39m
+ [32m✓[39m src/gen/__tests__/easingSpec.test.ts [2m([22m[2m5 tests[22m[2m)[22m[90m 14[2mms[22m[39m
+ [32m✓[39m src/compositor/__tests__/effectFilter.test.ts [2m([22m[2m6 tests[22m[2m)[22m[90m 11[2mms[22m[39m
+ [32m✓[39m src/color/__tests__/palette.test.ts [2m([22m[2m1 test[22m[2m)[22m[33m 1169[2mms[22m[39m
+   [33m[2m✓[22m[39m palette extraction (our own median-cut over FFmpeg pixels)[2m > [22mextracts red and blue with prominence weights that sum to ~1 [33m630[2mms[22m[39m
+ [32m✓[39m src/gen/__tests__/download.test.ts [2m([22m[2m3 tests[22m[2m)[22m[90m 40[2mms[22m[39m
+ [32m✓[39m src/ui/__tests__/waitlist.test.tsx [2m([22m[2m3 tests[22m[2m)[22m[90m 22[2mms[22m[39m
+ [32m✓[39m src/gen/__tests__/primitivesRegist [32m✓[39m src/gen/__tests__/generativeRender.test.ts [2m([22m[2m14 tests[22m[2m)[22m[33m 336564[2mms[22m[39m
+   [33m[2m✓[22m[39m Generative render[2m > [22mrenders a MINIMAL sparse spec (no background/particles/camera/enter) to a non-blank MP4 — premium-by-construction defaults must kick in [33m25371[2mms[ [32m✓[39m src/gen/__tests__/generativeRender.test.ts [2m([22m[2m14 tests[22m[2m)[22m[33m 317162[2mms[22m[39m
+   [33m[2m✓[22m[39m Generative render[2m > [22mrenders a MINIMAL sparse spec (no background/particles/camera/enter) to a non-blank MP4 — premium-by-construction defaults must kick in [33m22012[2mms[22m[39m
+   [33m[2m✓[22m[39m Generative render[2m > [22mrenders a minimal spec to a non-trivial MP4 [33m19337[2mms[22m[39m
+   [33m[2m✓[22m[39m Generative render[2m > [22mrenders a 2-beat spec with a transition + particles + camera push-in (no hard cuts, atmosphere) [33m37936[2mms[22m[39m
+   [33m[2m✓[22m[39m Generative render[2m > [22mrenders a data-story spec (barChart + counter, then timeline + captionKaraoke across a wipe transition) — 'show the product working' primitives [33m44235[2mms[22m[39m
+   [33m[2m✓[22m[39m Generative render[2m > [22mrenders a screenMock (real product screenshot) + arrow + highlightBox — 'show the product' primitives [33m25524[2mms[22m[39m
+   [33m[2m✓[22m[39m Generative render[2m > [22mrenders the Task 9 premium-motion set (maskReveal+kenBurns+lightingSweep on an image, splitLayout, textOnPath, glitch exit) to a non-blank MP4 [33m33373[2mms[22m[39m
+   [33m[2m✓[22m[39m Generative render[2m > [22mrenders a spec using per-property animate + hold + bezier easing + custom overlap [33m20465[2mms[22m[39m
+   [33m[2m✓[22m[39m Generative render[2m > [22mrenders animate.position ALONE (no animate.opacity, no enter authored) and the entrance-driven opacity fade survives — FINDING 1 regression [33m12563[2mms[22m[39m
+   [33m[2m✓[22m[39m Generative render[2m > [22mrenders a LEFT-anchored text at x:0.12 with ink pixels near the left edge — proves anchor:'left' places the text's start near position.x, not centered on it [33m13668[2mms[22m[39m
+   [33m[2m✓[22m[39m Generative render[2m > [22mrenders a mono-font text without error [33m12926[2mms[22m[39m
+   [33m[2m✓[22m[39m Generative render[2m > [22mrenders a LEFT-anchored hairline shaped by enter.easing/durationFrames, with ink starting at the anchor and not centered on it [33m15294[2mms[22m[39m
+   [33m[2m✓[22m[39m Generative render[2m > [22mrenders wordStagger with SEQUENTIAL per-word reveal — early frame shows only the first word, later frame shows the last word too [33m33296[2mms[22m[39m
+   [33m[2m✓[22m[39m Generative render[2m > [22mrenders camera.easing + an authored EARLY outFade:[20,34] window — content fades inside that window although it sits nowhere near the old hardcoded last-18-frames default [33m13146[2mms[22m[39m
+   [33m[2m✓[22m[39m Generative render[2m > [22mrenders enter.pacing:'manual' and honors a large authored delay VERBATIM, skipping the auto-clamp — dark at frame 20, visible by frame 70 [33m13385[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m43 passed[39m[22m[90m (43)[39m
+[2m      Tests [22m [1m[32m272 passed[39m[22m[90m (272)[39m
+[2m   Start at [22m 01:59:40
+[2m   Duration [22m 319.08s[2m (transform 7.54s, setup 0ms, collect 15.49s, tests 387.83s, environment 20ms, prepare 24.49s)[22m
+

@@ -1,0 +1,122 @@
+        Info Looking up installed tauri packages to check mismatched versions...
+     Running beforeBuildCommand `npm run build && npm run bundle:server && node scripts/prepare-resources.mjs`
+
+> kaestral@1.0.0 build
+> tsc --noEmit && vite build
+
+[36mvite v5.4.21 [32mbuilding for production...[36m[39m
+transforming...
+[32m✓[39m 88 modules transformed.
+rendering chunks...
+[1m[33m[plugin:vite:reporter][39m[22m [33m[plugin vite:reporter] 
+(!) C:/Users/prabi/Downloads/palmier-pro-main (2)/palmier-win/node_modules/@tauri-apps/api/core.js is dynamically imported by C:/Users/prabi/Downloads/palmier-pro-main (2)/palmier-win/src/ui/Settings.tsx but also statically imported by C:/Users/prabi/Downloads/palmier-pro-main (2)/palmier-win/node_modules/@tauri-apps/api/app.js, C:/Users/prabi/Downloads/palmier-pro-main (2)/palmier-win/node_modules/@tauri-apps/api/dpi.js, C:/Users/prabi/Downloads/palmier-pro-main (2)/palmier-win/node_modules/@tauri-apps/api/event.js, C:/Users/prabi/Downloads/palmier-pro-main (2)/palmier-win/node_modules/@tauri-apps/api/image.js, C:/Users/prabi/Downloads/palmier-pro-main (2)/palmier-win/node_modules/@tauri-apps/api/webview.js, C:/Users/prabi/Downloads/palmier-pro-main (2)/palmier-win/node_modules/@tauri-apps/api/window.js, C:/Users/prabi/Downloads/palmier-pro-main (2)/palmier-win/node_modules/@tauri-apps/plugin-dialog/dist-js/index.js, C:/Users/prabi/Downloads/palmier-pro-main (2)/palmier-win/node_modules/@tauri-apps/plugin-process/dist-js/index.js, C:/Users/prabi/Downloads/palmier-pro-main (2)/palmier-win/node_modules/@tauri-apps/plugin-updater/dist-js/index.js, C:/Users/prabi/Downloads/palmier-pro-main (2)/palmier-win/src/ui/exportVideo.ts, dynamic import will not move module into another chunk.
+[39m
+computing gzip size...
+[2mdist/[22m[32mindex.html                  [39m[1m[2m  0.39 kB[22m[1m[22m[2m │ gzip:  0.26 kB[22m
+[2mdist/[22m[35massets/index-DtysqjDL.css   [39m[1m[2m  0.34 kB[22m[1m[22m[2m │ gzip:  0.23 kB[22m
+[2mdist/[22m[36massets/index-Bh9PlMxA.js    [39m[1m[2m  0.18 kB[22m[1m[22m[2m │ gzip:  0.15 kB[22m
+[2mdist/[22m[36massets/image-CjE3G2q8.js    [39m[1m[2m  0.61 kB[22m[1m[22m[2m │ gzip:  0.33 kB[22m
+[2mdist/[22m[36massets/index-DFDW1Q1o.js    [39m[1m[2m  1.08 kB[22m[1m[22m[2m │ gzip:  0.51 kB[22m
+[2mdist/[22m[36massets/app-BGylIdin.js      [39m[1m[2m  1.35 kB[22m[1m[22m[2m │ gzip:  0.56 kB[22m
+[2mdist/[22m[36massets/index-GHUP3eQG.js    [39m[1m[2m  1.44 kB[22m[1m[22m[2m │ gzip:  0.50 kB[22m
+[2mdist/[22m[36massets/webview-CWVCM9u3.js  [39m[1m[2m  3.34 kB[22m[1m[22m[2m │ gzip:  1.15 kB[22m
+[2mdist/[22m[36massets/window-CbFVk4pI.js   [39m[1m[2m 14.26 kB[22m[1m[22m[2m │ gzip:  3.59 kB[22m
+[2mdist/[22m[36massets/index-fXRmqCEG.js    [39m[1m[2m310.82 kB[22m[1m[22m[2m │ gzip: 93.33 kB[22m
+[32m✓ built in 4.56s[39m
+
+> kaestral@1.0.0 bundle:server
+> node scripts/bundle-server.mjs
+
+
+  dist-server\server.cjs     331.5kb
+  dist-server\renderCli.cjs   43.1kb
+
+Done in 461ms
+bundled → dist-server/server.cjs, dist-server/renderCli.cjs
+resources assembled:
+  node.exe     85 MB
+  ffmpeg.exe   194 MB
+  ffprobe.exe  194 MB
+  remotion     170 MB node_modules (chromium cache stripped)
+  + dist-server, public, @napi-rs/canvas, skills, whisper
+   Compiling windows-sys v0.61.2
+   Compiling smallvec v1.15.2
+   Compiling futures-core v0.3.32
+   Compiling tracing-core v0.1.36
+   Compiling ring v0.17.14
+   Compiling getrandom v0.2.17
+   Compiling untrusted v0.9.0
+   Compiling zeroize v1.9.0
+   Compiling icu_normalizer v2.2.0
+   Compiling rustls-pki-types v1.15.0
+   Compiling parking_lot_core v0.9.12
+   Compiling http-body v1.0.1
+   Compiling semver v1.0.28
+   Compiling tracing v0.1.44
+   Compiling futures-macro v0.3.32
+   Compiling slab v0.4.12
+   Compiling httparse v1.10.1
+   Compiling rustls v0.23.42
+   Compiling futures-task v0.3.32
+   Compiling parking_lot v0.12.5
+   Compiling idna_adapter v1.2.2
+   Compiling idna v1.1.0
+   Compiling tower-service v0.3.3
+   Compiling try-lock v0.2.5
+   Compiling subtle v2.6.1
+   Compiling want v0.3.1
+   Compiling futures-util v0.3.32
+   Compiling url v2.5.8
+   Compiling futures-channel v0.3.32
+   Compiling atomic-waker v1.1.2
+   Compiling sync_wrapper v1.0.2
+   Compiling tower-layer v0.3.3
+   Compiling ipnet v2.12.0
+   Compiling tauri-plugin-updater v2.10.1
+   Compiling crc32fast v1.5.0
+   Compiling getrandom v0.4.3
+   Compiling urlpattern v0.3.0
+   Compiling tao v0.35.3
+   Compiling futures-sink v0.3.32
+   Compiling http-body-util v0.1.3
+   Compiling socket2 v0.6.4
+   Compiling mio v1.2.1
+   Compiling winapi-util v0.1.11
+   Compiling same-file v1.0.6
+   Compiling walkdir v2.5.0
+   Compiling dirs-sys v0.5.0
+   Compiling softbuffer v0.4.8
+   Compiling dirs v6.0.0
+   Compiling tokio v1.52.3
+   Compiling tauri-utils v2.9.3
+   Compiling rustls-webpki v0.103.13
+   Compiling muda v0.19.3
+   Compiling fastrand v2.4.1
+   Compiling tempfile v3.27.0
+   Compiling zip v4.6.1
+   Compiling kaestral v1.0.0 (C:\Users\prabi\Downloads\palmier-pro-main (2)\palmier-win\src-tauri)
+   Compiling minisign-verify v0.2.5
+   Compiling tauri-runtime v2.11.3
+   Compiling hyper v1.10.1
+   Compiling tauri-runtime-wry v2.11.4
+   Compiling hyper-util v0.1.20
+   Compiling tauri v2.11.5
+   Compiling tokio-rustls v0.26.4
+   Compiling tower v0.5.3
+   Compiling rustls-platform-verifier v0.7.0
+   Compiling hyper-rustls v0.27.9
+   Compiling tokio-util v0.7.18
+   Compiling tower-http v0.6.11
+   Compiling reqwest v0.13.4
+   Compiling tauri-plugin-fs v2.5.1
+   Compiling tauri-plugin-dialog v2.7.1
+    Finished `release` profile [optimized] target(s) in 5m 39s
+       Built application at: C:\Users\prabi\Downloads\palmier-pro-main (2)\palmier-win\src-tauri\target\release\kaestral.exe
+        Info Patching C:\Users\prabi\Downloads\palmier-pro-main (2)\palmier-win\src-tauri\target\release\kaestral.exe with bundle type information: nsis
+        Info Target: x64
+     Running makensis to produce C:\Users\prabi\Downloads\palmier-pro-main (2)\palmier-win\src-tauri\target\release\bundle\nsis\Kaestral_1.0.0_x64-setup.exe
+    Finished 1 bundle at:
+        C:\Users\prabi\Downloads\palmier-pro-main (2)\palmier-win\src-tauri\target\release\bundle\nsis\Kaestral_1.0.0_x64-setup.exe
+
+A public key has been found, but no private key. Make sure to set `TAURI_SIGNING_PRIVATE_KEY` environment variable.
+       Error A public key has been found, but no private key. Make sure to set `TAURI_SIGNING_PRIVATE_KEY` environment variable.

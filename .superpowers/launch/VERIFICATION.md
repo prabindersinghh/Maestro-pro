@@ -30,3 +30,12 @@
 
 ## Publish/deploy commands
 - Documented in docs/LAUNCH-RUNBOOK.md (npm publish, GitHub release, Vercel deploy, updater key setup).
+
+## Installer build — COMPLETE
+- `npm run tauri build` exit 0. Rust release compile 5m39s + NSIS packaging.
+- Output: src-tauri/target/release/bundle/nsis/**Kaestral_1.0.0_x64-setup.exe** (162 MB) ✓
+- No .sig / updater signature: EXPECTED — createUpdaterArtifacts is on but no signing key is set
+  yet ("public key found, but no private key"). Generating the key is the one-time user step in
+  docs/UPDATER-SETUP.md. The installer is complete and installable now; auto-update signing is
+  enabled the moment the key is generated + pubkey pasted. The 162MB installer bundles node.exe,
+  ffmpeg/ffprobe, dist-server, remotion (chromium stripped), skills, whisper.
