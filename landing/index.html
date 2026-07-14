@@ -59,14 +59,6 @@
     -webkit-mask-image:radial-gradient(80% 55% at 50% 0%,#000,transparent 78%);
     mask-image:radial-gradient(80% 55% at 50% 0%,#000,transparent 78%)}
 
-  /* ---- left-gutter playhead rail: the page IS a timeline you scrub ---- */
-  .rail{position:fixed;left:max(14px,calc((100vw - var(--maxw))/2 - 14px));top:0;bottom:0;width:2px;z-index:40;pointer-events:none;
-    background:linear-gradient(180deg,transparent,var(--gold-dim) 8%,var(--gold-dim) 92%,transparent)}
-  .rail .head{position:absolute;left:-4px;width:10px;height:10px;transform:translateY(-50%) rotate(45deg);
-    background:var(--green);box-shadow:0 0 14px var(--green-hi);top:0;transition:top .08s linear}
-  .rail .fill{position:absolute;left:0;top:0;width:2px;background:linear-gradient(180deg,var(--green-hi),var(--green));box-shadow:0 0 10px var(--green-glow)}
-  @media(max-width:1180px){.rail{display:none}}
-
   /* ---- buttons ---- */
   .btn{display:inline-flex;align-items:center;gap:8px;font-weight:600;font-size:14px;border-radius:8px;padding:10px 17px;cursor:pointer;border:1px solid transparent;transition:.16s ease;font-family:var(--ui);white-space:nowrap}
   .btn-primary{background:var(--green);color:#04180d;border-color:var(--green)}
@@ -263,7 +255,6 @@
 <body>
 <div class="bg-glow" id="glow"></div>
 <div class="bg-grid"></div>
-<div class="rail" aria-hidden="true"><div class="fill" id="railfill"></div><div class="head" id="railhead"></div></div>
 
 <!-- reusable logo mark: the app's three-bar timeline, green top bar -->
 <svg width="0" height="0" style="position:absolute" aria-hidden="true"><symbol id="klogo" viewBox="0 0 24 24">
@@ -607,22 +598,8 @@
   const io = new IntersectionObserver((es)=>es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target)}}),{threshold:.14});
   document.querySelectorAll('.rev,.draw').forEach(el=>io.observe(el));
 
-  // playhead rail tracks scroll; hero glow gets a faint parallax
-  const head=document.getElementById('railhead'), fill=document.getElementById('railfill'), glow=document.getElementById('glow');
-  const reduce=matchMedia('(prefers-reduced-motion:reduce)').matches;
-  let ticking=false;
-  function onScroll(){
-    if(ticking) return; ticking=true;
-    requestAnimationFrame(()=>{
-      const max=document.documentElement.scrollHeight-innerHeight;
-      const p=max>0?Math.min(1,scrollY/max):0;
-      const y=p*innerHeight*0.92+innerHeight*0.04;
-      head.style.top=y+'px'; fill.style.height=y+'px';
-      if(!reduce&&glow) glow.style.transform='translateY('+(scrollY*0.06)+'px)';
-      ticking=false;
-    });
-  }
-  addEventListener('scroll',onScroll,{passive:true}); addEventListener('resize',onScroll); onScroll();
+  // Ambient glow + grid are static (position:fixed, no scroll-driven transform) — they stay put
+  // as the page scrolls rather than drifting with it.
 
   // waitlist: POSTs { email, source } to WAITLIST_ENDPOINT (Formspree). Falls back to a mailto: link
   // if the request fails for any reason, so the signup never dead-ends.
