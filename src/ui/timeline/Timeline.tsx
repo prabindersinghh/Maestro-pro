@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { store, useEditorVersion } from "../../state/store";
 import { theme, clipColor } from "../theme";
 import { TimelineGeometry } from "./geometry";
@@ -61,17 +61,8 @@ export function Timeline() {
   const dragRef = useRef<DragOrigin | null>(null);
   const [ghost, setGhost] = useState<{ clipId: string; trackIndex: number; startFrame: number } | null>(null);
 
-  // Keyboard shortcuts.
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      const mod = e.metaKey || e.ctrlKey;
-      if (mod && e.key.toLowerCase() === "z") { e.preventDefault(); e.shiftKey ? store.redo() : store.undo(); return; }
-      if (e.key === "Delete" || e.key === "Backspace") { e.preventDefault(); store.removeSelected(); return; }
-      if (e.key.toLowerCase() === "s") { store.splitAtPlayhead(); return; }
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, []);
+  // Keyboard shortcuts (Space/S/Del/undo/redo) are handled once, globally, in Editor.tsx — this
+  // component intentionally does not bind its own copy so they can't double-fire.
 
   const localX = (clientX: number): number => {
     const rect = contentRef.current?.getBoundingClientRect();

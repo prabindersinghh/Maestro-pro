@@ -74,7 +74,13 @@ export class EditorStore {
     gpuZone: lsGet("kaestral.gpuZone") ?? "us-central1-a",
     gpuInstance: lsGet("kaestral.gpuInstance") ?? "ltx-gpu",
     gpuPort: Number(lsGet("kaestral.gpuPort") ?? "8000"),
+    /** First-run onboarding: shown once, then persisted so it never reappears. */
+    onboarded: lsGet("kaestral.onboarded") === "1",
+    /** Discoverable keyboard-shortcuts cheat-sheet ("?" key or toolbar button). */
+    showShortcuts: false,
   };
+  /** True once there are unsaved changes since the last save/export — drives the close-guard. */
+  dirty = false;
   private listeners = new Set<() => void>();
   private version = 0;
   /** Transient status messages shown as toasts (transitions added, import errors, …). */
@@ -107,6 +113,11 @@ export class EditorStore {
     this.bridge?.onLocalChange();
     for (const l of this.listeners) l();
   }
+
+  /** Flag that the project has unsaved changes (called from content-mutating ops). Cleared on save/export. */
+  markDirty(): void { this.dirty = true; }
+  /** Clear the unsaved-changes flag (called after a successful export/save). */
+  clearDirty(): void { this.dirty = false; }
 
   /** Show a transient toast; auto-dismisses. */
   toast(text: string, kind: "info" | "error" = "info"): void {
@@ -190,6 +201,14 @@ export class EditorStore {
 
   openSettings(open: boolean): void { this.settings.showSettings = open; this.emit(); }
   openWaitlist(open: boolean): void { this.settings.showWaitlist = open; this.emit(); }
+  openShortcuts(open: boolean): void { this.settings.showShortcuts = open; this.emit(); }
+  /** Mark first-run onboarding as complete so it never shows again. Safe to call more than once. */
+  completeOnboarding(): void {
+    if (this.settings.onboarded) return;
+    this.settings.onboarded = true;
+    lsSet("kaestral.onboarded", "1");
+    this.emit();
+  }
   /** Join the Pro/AI-features waitlist. POSTs to VITE_WAITLIST_URL if set; else signals a mailto fallback. */
   async joinWaitlist(email: string): Promise<{ ok: boolean; mode: "posted" | "mailto" | "error"; detail?: string }> {
     const url = ((): string => { try { return (import.meta as unknown as { env?: Record<string, string> }).env?.VITE_WAITLIST_URL ?? ""; } catch { return ""; } })();
@@ -275,6 +294,7 @@ export class EditorStore {
       if (p.height && p.height > 0) this.timeline.height = Math.round(p.height);
       this.timeline.settingsConfigured = true;
     });
+    this.markDirty();
     this.emit();
   }
 
@@ -284,6 +304,7 @@ export class EditorStore {
     if (!t) return;
     if (t.type === "audio") t.muted = !t.muted;
     else t.hidden = !t.hidden;
+    this.markDirty();
     this.emit();
   }
 
@@ -291,7 +312,7 @@ export class EditorStore {
   addTransitionsAtCuts(durationSeconds = 0.5): number {
     const frames = Math.max(1, Math.round(durationSeconds * this.timeline.fps));
     const n = this.engine.addTransitionsAtCuts(frames);
-    if (n > 0) this.emit();
+    if (n > 0) { this.markDirty(); this.emit(); }
     return n;
   }
 
@@ -324,22 +345,24 @@ export class EditorStore {
         c.textAnimation = { preset: "none", perWordFrames: 3, ...c.textAnimation, ...patch.animation } as Clip["textAnimation"];
       }
     }, "Edit Text");
+    this.markDirty();
     this.emit();
   }
 
   /** Trim a clip's left/right edge by a project-frame delta (drag handles); one undo step. */
   trimClip(clipId: string, edge: "left" | "right", deltaFrames: number): void {
     if (Math.round(deltaFrames) === 0) return;
-    if (this.engine.commitTrim(clipId, edge, Math.round(deltaFrames), true)) this.emit();
+    if (this.engine.commitTrim(clipId, edge, Math.round(deltaFrames), true)) { this.markDirty(); this.emit(); }
   }
 
   moveClip(clipId: string, toTrack: number, toFrame: number): void {
-    if (this.engine.moveClips([{ clipId, toTrack, toFrame }])) this.emit();
+    if (this.engine.moveClips([{ clipId, toTrack, toFrame }])) { this.markDirty(); this.emit(); }
   }
   removeSelected(): void {
     const ids = [...this.view.selectedClipIds];
     if (ids.length && this.engine.removeClips(ids)) {
       this.view.selectedClipIds = new Set();
+      this.markDirty();
     }
     this.emit();
   }
@@ -351,14 +374,15 @@ export class EditorStore {
       .map((c) => ({ clipId: c.id, atFrame: f }));
     if (splits.length) {
       this.engine.splitClips(splits);
+      this.markDirty();
       this.emit();
     }
   }
   undo(): void {
-    if (this.engine.undo() !== null) this.emit();
+    if (this.engine.undo() !== null) { this.markDirty(); this.emit(); }
   }
   redo(): void {
-    if (this.engine.redo() !== null) this.emit();
+    if (this.engine.redo() !== null) { this.markDirty(); this.emit(); }
   }
 
   get selectedClip(): Clip | null {
@@ -383,6 +407,7 @@ export class EditorStore {
         if (patch.fadeOutFrames !== undefined) c.fadeOutFrames = Math.max(0, Math.round(patch.fadeOutFrames));
       }, "Change Clip Property");
     }
+    this.markDirty();
     this.emit();
   }
 
@@ -409,6 +434,7 @@ export class EditorStore {
     }
     existing.push({ frame: offset, value, interpolationOut: "smooth" });
     this.engine.setKeyframes(clip.id, property, existing);
+    this.markDirty();
     this.emit();
   }
 
@@ -416,6 +442,7 @@ export class EditorStore {
     const clip = this.selectedClip;
     if (!clip) return;
     this.engine.setKeyframes(clip.id, property, []);
+    this.markDirty();
     this.emit();
   }
 
@@ -427,6 +454,7 @@ export class EditorStore {
 
   private writeKeyframes(clipId: string, property: AnimatableProperty, kfs: { frame: number; value: KeyframeValue; interpolationOut: "smooth" }[]): void {
     this.engine.setKeyframes(clipId, property, kfs.map((k) => ({ frame: k.frame, value: k.value, interpolationOut: k.interpolationOut })));
+    this.markDirty();
     this.emit();
   }
 
@@ -459,6 +487,7 @@ export class EditorStore {
     const ids = new Set(this.view.selectedClipIds);
     if (ids.size === 0) return;
     this.engine.mutateClips(ids, (c) => applyColorGrade(c, patch, false), "Apply Color");
+    this.markDirty();
     this.emit();
   }
 
@@ -509,6 +538,7 @@ export class EditorStore {
       });
     }
     this.engine.addClips(specs);
+    this.markDirty();
     this.emit();
   }
 }

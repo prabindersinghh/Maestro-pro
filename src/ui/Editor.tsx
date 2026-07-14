@@ -9,8 +9,14 @@ import { Settings } from "./Settings";
 import { GenerationPanel } from "./GenerationPanel";
 import { WaitlistModal } from "./WaitlistModal";
 import { ChatPanel } from "./ChatPanel";
+import { Onboarding } from "./Onboarding";
+import { ShortcutsModal } from "./ShortcutsModal";
+import { CloseConfirm } from "./CloseConfirm";
 import { exportVideoFromUI } from "./exportVideo";
 import { previewAudio } from "../audio/previewAudio";
+import { humanizeError } from "./errors";
+
+const inTauri = (): boolean => "__TAURI_INTERNALS__" in globalThis;
 
 function tc(frame: number, fps: number): string {
   const f = Math.round(frame) % fps;
@@ -54,22 +60,43 @@ function Badge({ children }: { children: React.ReactNode }) {
   );
 }
 
+// Small animated indeterminate progress indicator (export has no real % from the render pipeline
+// today, so a pulsing dot keeps the UI from looking frozen). `dark` = for use on the accent button.
+function PulsingDot({ dark }: { dark?: boolean }) {
+  return (
+    <span
+      style={{
+        display: "inline-block", width: 6, height: 6, borderRadius: 3, flex: "0 0 auto",
+        background: dark ? theme.color.onAccent : theme.color.accent,
+        animation: "kaestral-pulse 1s ease-in-out infinite",
+      }}
+    />
+  );
+}
+
 export function Editor() {
   useEditorVersion();
   const { timeline } = store;
   const { currentFrame, pixelsPerFrame, playing } = store.view;
   const floatFrame = useRef(currentFrame);
   const [exportMsg, setExportMsg] = useState<string | null>(null);
+  const [exporting, setExporting] = useState(false);
   const [dragActive, setDragActive] = useState(false);
+  const [closeConfirmOpen, setCloseConfirmOpen] = useState(false);
   const total = store.totalFrames;
+  const timelineEmpty = total === 0;
 
   const doExport = async () => {
+    setExporting(true);
     setExportMsg("Exporting…");
     try {
       const r = await exportVideoFromUI(store.settings.exportCodec, store.settings.exportResolution);
+      store.clearDirty();
       setExportMsg(`Exported → ${r.outputPath}`);
     } catch (e) {
-      setExportMsg(e instanceof Error ? e.message : String(e));
+      setExportMsg(humanizeError(e, "Export failed"));
+    } finally {
+      setExporting(false);
     }
   };
 
@@ -96,6 +123,8 @@ export function Editor() {
     return () => { cancelAnimationFrame(raf); previewAudio.stop(); store.emit(); };
   }, [playing, timeline.fps]);
 
+  // Single source of truth for global shortcuts (Timeline.tsx no longer binds its own copy, so
+  // Space/S/Del/undo/redo can't double-fire).
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
@@ -104,9 +133,37 @@ export function Editor() {
       else if (e.key === "Delete" || e.key === "Backspace") { store.removeSelected(); }
       else if ((e.ctrlKey || e.metaKey) && e.key === "z" && !e.shiftKey) { e.preventDefault(); store.undo(); }
       else if ((e.ctrlKey || e.metaKey) && (e.key === "y" || (e.key === "z" && e.shiftKey))) { e.preventDefault(); store.redo(); }
+      else if (e.key === "?") { store.openShortcuts(!store.settings.showShortcuts); }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
+  // Unsaved-changes guard: browser/dev path (beforeunload) + Tauri path (window close-request).
+  useEffect(() => {
+    const onBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (!store.dirty) return;
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", onBeforeUnload);
+
+    let unlisten: (() => void) | undefined;
+    if (inTauri()) {
+      void import("@tauri-apps/api/window").then(({ getCurrentWindow }) => {
+        const win = getCurrentWindow();
+        void win.onCloseRequested(async (event) => {
+          if (store.dirty) {
+            event.preventDefault();
+            setCloseConfirmOpen(true);
+          }
+        }).then((fn) => { unlisten = fn; });
+      }).catch(() => undefined);
+    }
+    return () => {
+      window.removeEventListener("beforeunload", onBeforeUnload);
+      unlisten?.();
+    };
   }, []);
 
   useEffect(() => {
@@ -115,7 +172,7 @@ export function Editor() {
     // failure surfaces as a toast instead of being silently swallowed.
     const importOne = async (name: string, run: () => Promise<unknown>) => {
       try { await run(); store.toast(`Imported ${name}`); }
-      catch (e) { store.toast(`Couldn't import ${name}: ${e instanceof Error ? e.message : String(e)}`, "error"); }
+      catch (e) { store.toast(humanizeError(e, `Couldn't import ${name}`), "error"); }
     };
     const onDragOver = (e: DragEvent) => { e.preventDefault(); setDragActive(true); };
     const onDragLeave = (e: DragEvent) => { if (e.relatedTarget === null) setDragActive(false); };
@@ -151,17 +208,33 @@ export function Editor() {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100vh", background: theme.color.base, color: theme.color.textPrimary, fontFamily: theme.font.ui, overflow: "hidden" }}>
+      {/* Global animation keyframes + focus-visible outline for key buttons (scoped, additive). */}
+      <style>{`
+        @keyframes kaestral-pulse { 0%, 100% { opacity: 0.35; transform: scale(0.85); } 50% { opacity: 1; transform: scale(1.15); } }
+        button:focus-visible { outline: 2px solid ${theme.color.accent}; outline-offset: 2px; }
+      `}</style>
       {/* Title bar */}
       <div style={{ display: "flex", alignItems: "center", gap: theme.space.smMd, height: 44, padding: `0 ${theme.space.mdLg}px`, borderBottom: `1px solid ${theme.color.borderPrimary}`, background: theme.color.raised, flex: "0 0 auto" }}>
         <span style={{ fontSize: theme.fontSize.md, fontWeight: 600, letterSpacing: 0.2 }}>Kaestral</span>
         <span
           title={store.bridge?.connected ? "Connected — the AI can edit your project" : "Reconnecting to the project engine…"}
-          style={{ width: 7, height: 7, borderRadius: 4, background: store.bridge?.connected ? theme.color.success : "#e0a63b" }}
+          style={{ width: 7, height: 7, borderRadius: 4, background: store.bridge?.connected ? theme.color.success : theme.color.warning }}
         />
         <div style={{ flex: 1 }} />
         <span style={{ fontSize: theme.fontSize.smMd, color: theme.color.textTertiary }}>Untitled Project</span>
         <div style={{ flex: 1 }} />
-        {exportMsg && <span style={{ fontSize: theme.fontSize.xs, color: theme.color.textTertiary, maxWidth: 240, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{exportMsg}</span>}
+        {exportMsg && (
+          <span style={{ display: "flex", alignItems: "center", gap: 6, fontSize: theme.fontSize.xs, color: theme.color.textTertiary, maxWidth: 260, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            {exporting && <PulsingDot />}
+            {exportMsg}
+          </span>
+        )}
+        <button
+          onClick={() => store.openShortcuts(true)} title="Keyboard shortcuts (?)"
+          style={{ background: "transparent", color: theme.color.textSecondary, border: "none", borderRadius: theme.radius.sm, padding: "6px 8px", fontSize: 15, cursor: "pointer" }}
+        >
+          ⌨
+        </button>
         <button
           onClick={() => {
             if (store.settings.connectMode === "inapp" && store.settings.apiKey.trim()) store.openChat(!store.settings.showChat);
@@ -170,7 +243,7 @@ export function Editor() {
           title="Connect / open AI"
           style={{ background: store.settings.showChat ? theme.color.prominent : "transparent", color: theme.color.textSecondary, border: `1px solid ${theme.color.borderSubtle}`, borderRadius: theme.radius.sm, padding: "6px 12px", fontSize: theme.fontSize.smMd, cursor: "pointer", fontFamily: theme.font.ui, display: "flex", alignItems: "center", gap: 6 }}
         >
-          <span style={{ width: 7, height: 7, borderRadius: 4, background: store.bridge?.connected ? theme.color.success : "#e0a63b" }} /> {store.settings.connectMode === "inapp" && store.settings.apiKey.trim() ? "AI Chat" : "Connect AI"}
+          <span style={{ width: 7, height: 7, borderRadius: 4, background: store.bridge?.connected ? theme.color.success : theme.color.warning }} /> {store.settings.connectMode === "inapp" && store.settings.apiKey.trim() ? "AI Chat" : "Connect AI"}
         </button>
         <button
           onClick={() => store.openWaitlist(true)} title="Kaestral Pro — AI generation (join the waitlist)"
@@ -185,10 +258,17 @@ export function Editor() {
           ⚙
         </button>
         <button
-          onClick={doExport} title={`Render ${store.settings.exportCodec} via FFmpeg`}
-          style={{ background: theme.color.accent, color: "#1a1a1a", border: "none", borderRadius: theme.radius.sm, padding: "6px 14px", fontSize: theme.fontSize.smMd, fontWeight: 600, cursor: "pointer", fontFamily: theme.font.ui }}
+          onClick={doExport} title={exporting ? "Export in progress…" : `Render ${store.settings.exportCodec} via FFmpeg`}
+          disabled={exporting}
+          style={{
+            background: exporting ? theme.color.raised : theme.color.accent,
+            color: exporting ? theme.color.textMuted : theme.color.onAccent,
+            border: "none", borderRadius: theme.radius.sm, padding: "6px 14px", fontSize: theme.fontSize.smMd, fontWeight: 600,
+            cursor: exporting ? "default" : "pointer", fontFamily: theme.font.ui, opacity: exporting ? 0.7 : 1,
+            display: "flex", alignItems: "center", gap: 6,
+          }}
         >
-          Export
+          {exporting && <PulsingDot dark />} {exporting ? "Exporting…" : "Export"}
         </button>
       </div>
 
@@ -241,14 +321,34 @@ export function Editor() {
           />
           <IconBtn glyph="＋" title="Zoom in" onClick={() => store.setZoom(pixelsPerFrame * theme.zoom.stepFactor)} />
         </div>
-        <div style={{ flex: "1 1 auto", minHeight: 0 }}>
+        <div style={{ flex: "1 1 auto", minHeight: 0, position: "relative" }}>
           <Timeline />
+          {timelineEmpty && (
+            <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", pointerEvents: "none" }}>
+              <div style={{ fontSize: theme.fontSize.smMd, color: theme.color.textMuted, textAlign: "center", lineHeight: 1.6, maxWidth: 360 }}>
+                Your timeline is empty.<br />Import media (top-left) or ask the AI to build an edit.
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
       <Settings />
       <GenerationPanel />
       <WaitlistModal />
+      <Onboarding />
+      <ShortcutsModal />
+      {closeConfirmOpen && (
+        <CloseConfirm
+          onCancel={() => setCloseConfirmOpen(false)}
+          onConfirm={() => {
+            setCloseConfirmOpen(false);
+            if (inTauri()) {
+              void import("@tauri-apps/api/window").then(({ getCurrentWindow }) => getCurrentWindow().destroy());
+            }
+          }}
+        />
+      )}
 
       {/* Drag-drop hint overlay */}
       {dragActive && (
@@ -262,7 +362,7 @@ export function Editor() {
       {/* Toast stack */}
       <div style={{ position: "fixed", bottom: 16, left: "50%", transform: "translateX(-50%)", zIndex: 200, display: "flex", flexDirection: "column", gap: 8, alignItems: "center", pointerEvents: "none" }}>
         {store.toasts.map((t) => (
-          <div key={t.id} style={{ maxWidth: 520, fontSize: theme.fontSize.smMd, color: t.kind === "error" ? "#ffd9d9" : theme.color.textPrimary, background: t.kind === "error" ? "#5a2020" : theme.color.raised, border: `1px solid ${t.kind === "error" ? "#a34" : theme.color.borderPrimary}`, borderRadius: theme.radius.sm, padding: `${theme.space.sm}px ${theme.space.md}px`, boxShadow: "0 8px 24px rgba(0,0,0,0.5)" }}>
+          <div key={t.id} style={{ maxWidth: 520, fontSize: theme.fontSize.smMd, color: t.kind === "error" ? theme.color.errorText : theme.color.textPrimary, background: t.kind === "error" ? theme.color.errorBg : theme.color.raised, border: `1px solid ${t.kind === "error" ? theme.color.errorBorder : theme.color.borderPrimary}`, borderRadius: theme.radius.sm, padding: `${theme.space.sm}px ${theme.space.md}px`, boxShadow: "0 8px 24px rgba(0,0,0,0.5)" }}>
             {t.text}
           </div>
         ))}

@@ -30,6 +30,11 @@ export const theme = {
     selection: "#f5efe4",
     success: "#4fb85f",
     error: "#e54f4f",
+    warning: "#e0a63b", // connecting / pending states (amber)
+    errorBg: "#5a2020",
+    errorBorder: "#a34",
+    errorText: "#ffd9d9",
+    onAccent: "#1a1a1a", // text color for content sitting on the accent (warm off-white) background
 
     // Back-compat aliases (older components reference these)
     bg: bg.base,

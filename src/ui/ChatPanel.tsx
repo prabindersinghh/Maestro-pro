@@ -7,6 +7,7 @@ import { store, useEditorVersion } from "../state/store";
 import { theme } from "./theme";
 import { BRIDGE_URL } from "../state/bridge";
 import { KaestralAgent, type Msg, type ContentBlock } from "../agent/agent";
+import { humanizeError } from "./errors";
 
 function textOf(content: string | ContentBlock[]): string {
   if (typeof content === "string") return content;
@@ -53,7 +54,7 @@ export function ChatPanel() {
           block = { type: "image", source: { type: "base64", media_type: f.type, data: dataUrl.split(",")[1] } };
         }
         setAttachments((a) => [...a, { name: f.name, assetId, block }]);
-      } catch (e) { setError(e instanceof Error ? e.message : String(e)); }
+      } catch (e) { setError(humanizeError(e, `Couldn't attach ${f.name}`)); }
     }
   };
 
@@ -67,7 +68,7 @@ export function ChatPanel() {
     const note = attachments.length ? `\n\n[Attached & imported: ${attachments.map((a) => `${a.name} (assetId ${a.assetId})`).join(", ")}]` : "";
     setAttachments([]);
     try { await agent.send(text + note, blocks); }
-    catch (e) { setError(e instanceof Error ? e.message : String(e)); }
+    catch (e) { setError(humanizeError(e, "The AI hit a snag")); }
   };
 
   return (
@@ -84,7 +85,7 @@ export function ChatPanel() {
       {!hasKey ? (
         <div style={{ padding: theme.space.xl, color: theme.color.textSecondary, fontSize: theme.fontSize.smMd, lineHeight: 1.6 }}>
           Add your Anthropic API key to use in-app chat.
-          <button onClick={() => { store.openChat(false); store.setConnectMode("inapp"); store.openSettings(true); }} style={{ display: "block", marginTop: theme.space.md, background: theme.color.accent, color: "#1a1a1a", border: "none", borderRadius: theme.radius.sm, padding: "8px 14px", fontSize: theme.fontSize.smMd, fontWeight: 600, cursor: "pointer" }}>Open Connect AI settings</button>
+          <button onClick={() => { store.openChat(false); store.setConnectMode("inapp"); store.openSettings(true); }} style={{ display: "block", marginTop: theme.space.md, background: theme.color.accent, color: theme.color.onAccent, border: "none", borderRadius: theme.radius.sm, padding: "8px 14px", fontSize: theme.fontSize.smMd, fontWeight: 600, cursor: "pointer" }}>Open Connect AI settings</button>
         </div>
       ) : (
         <>
@@ -128,7 +129,7 @@ export function ChatPanel() {
                 onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); void send(); } }}
                 style={{ flex: 1, resize: "none", background: theme.color.base, color: theme.color.textPrimary, border: `1px solid ${theme.color.borderSubtle}`, borderRadius: theme.radius.sm, padding: "8px 10px", fontSize: theme.fontSize.smMd, fontFamily: theme.font.ui }}
               />
-              <button onClick={() => void send()} disabled={thinking || !input.trim()} style={{ height: 34, background: thinking || !input.trim() ? theme.color.raised : theme.color.accent, color: thinking || !input.trim() ? theme.color.textMuted : "#1a1a1a", border: "none", borderRadius: theme.radius.sm, padding: "0 14px", fontSize: theme.fontSize.smMd, fontWeight: 600, cursor: "pointer" }}>Send</button>
+              <button onClick={() => void send()} disabled={thinking || !input.trim()} style={{ height: 34, background: thinking || !input.trim() ? theme.color.raised : theme.color.accent, color: thinking || !input.trim() ? theme.color.textMuted : theme.color.onAccent, border: "none", borderRadius: theme.radius.sm, padding: "0 14px", fontSize: theme.fontSize.smMd, fontWeight: 600, cursor: "pointer" }}>Send</button>
             </div>
           </div>
         </>

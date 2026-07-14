@@ -6,6 +6,7 @@ import { useState } from "react";
 import { store, useEditorVersion } from "../state/store";
 import { theme, sectionLabelStyle } from "./theme";
 import { BRIDGE_URL } from "../state/bridge";
+import { humanizeError } from "./errors";
 
 const MCP_URL = `${BRIDGE_URL}/mcp`;
 const CONNECT_CMD = `claude mcp add --transport http kaestral ${MCP_URL}`;
@@ -88,7 +89,7 @@ function ConnectChooser() {
       <ul style={{ margin: 0, paddingLeft: 16, color: theme.color.textSecondary, fontSize: theme.fontSize.smMd, lineHeight: 1.6, flex: 1 }}>
         {points.map((p, i) => <li key={i}>{p}</li>)}
       </ul>
-      <button onClick={onPick} style={{ marginTop: theme.space.mdLg, background: theme.color.accent, color: "#1a1a1a", border: "none", borderRadius: theme.radius.sm, padding: "8px", fontSize: theme.fontSize.smMd, fontWeight: 600, cursor: "pointer" }}>{cta}</button>
+      <button onClick={onPick} style={{ marginTop: theme.space.mdLg, background: theme.color.accent, color: theme.color.onAccent, border: "none", borderRadius: theme.radius.sm, padding: "8px", fontSize: theme.fontSize.smMd, fontWeight: 600, cursor: "pointer" }}>{cta}</button>
     </div>
   );
   return (
@@ -135,7 +136,7 @@ function InAppSetup() {
       <div style={{ display: "flex", gap: theme.space.sm, marginBottom: theme.space.mdLg }}>
         <input type="password" value={key} onChange={(e) => setKey(e.target.value)} placeholder="sk-ant-…"
           style={{ flex: 1, background: theme.color.base, color: theme.color.textPrimary, border: `1px solid ${theme.color.borderSubtle}`, borderRadius: theme.radius.sm, padding: "7px 9px", fontSize: theme.fontSize.smMd, fontFamily: theme.font.mono }} />
-        <button onClick={() => store.setApiKey(key.trim())} style={{ background: theme.color.accent, color: "#1a1a1a", border: "none", borderRadius: theme.radius.sm, padding: "0 14px", fontSize: theme.fontSize.smMd, fontWeight: 600, cursor: "pointer" }}>Save</button>
+        <button onClick={() => store.setApiKey(key.trim())} style={{ background: theme.color.accent, color: theme.color.onAccent, border: "none", borderRadius: theme.radius.sm, padding: "0 14px", fontSize: theme.fontSize.smMd, fontWeight: 600, cursor: "pointer" }}>Save</button>
       </div>
       <Field label="Model">
         <select style={selectStyle} value={store.settings.model} onChange={(e) => store.setModel(e.target.value)}>
@@ -159,7 +160,7 @@ function LaunchButton() {
       await invoke("launch_claude_code");
       setStatus("A terminal opened — Claude is connecting to Kaestral. Edits will appear here live.");
     } catch (e) {
-      setStatus(`Couldn't launch: ${e instanceof Error ? e.message : String(e)}. Make sure Claude Code is installed (see manual steps).`);
+      setStatus(`${humanizeError(e, "Couldn't launch Claude Code")} Make sure Claude Code is installed (see manual steps).`);
     }
   };
   return (
@@ -167,7 +168,7 @@ function LaunchButton() {
       <button
         onClick={launch} disabled={!inTauri}
         title={inTauri ? "Open a terminal with Claude Code connected" : "Available in the Kaestral app"}
-        style={{ width: "100%", background: inTauri ? theme.color.accent : theme.color.raised, color: inTauri ? "#1a1a1a" : theme.color.textMuted, border: "none", borderRadius: theme.radius.sm, padding: "11px", fontSize: theme.fontSize.md, fontWeight: 700, cursor: inTauri ? "pointer" : "default" }}
+        style={{ width: "100%", background: inTauri ? theme.color.accent : theme.color.raised, color: inTauri ? theme.color.onAccent : theme.color.textMuted, border: "none", borderRadius: theme.radius.sm, padding: "11px", fontSize: theme.fontSize.md, fontWeight: 700, cursor: inTauri ? "pointer" : "default" }}
       >
         🚀 Launch Claude Code (connected)
       </button>
@@ -187,14 +188,14 @@ function ClaudeCodeSetup({ connected }: { connected: boolean }) {
   const Cmd = ({ cmd, tag }: { cmd: string; tag: string }) => (
     <div style={{ display: "flex", alignItems: "center", gap: theme.space.sm, marginBottom: theme.space.sm }}>
       <code style={{ flex: 1, background: theme.color.base, border: `1px solid ${theme.color.borderSubtle}`, borderRadius: theme.radius.sm, padding: "7px 9px", fontFamily: theme.font.mono, fontSize: theme.fontSize.sm, color: theme.color.textPrimary, overflowX: "auto", whiteSpace: "nowrap" }}>{cmd}</code>
-      <button onClick={() => copy(cmd, tag)} style={{ background: theme.color.accent, color: "#1a1a1a", border: "none", borderRadius: theme.radius.sm, padding: "7px 12px", fontSize: theme.fontSize.sm, fontWeight: 600, cursor: "pointer" }}>{copied === tag ? "✓" : "Copy"}</button>
+      <button onClick={() => copy(cmd, tag)} style={{ background: theme.color.accent, color: theme.color.onAccent, border: "none", borderRadius: theme.radius.sm, padding: "7px 12px", fontSize: theme.fontSize.sm, fontWeight: 600, cursor: "pointer" }}>{copied === tag ? "✓" : "Copy"}</button>
     </div>
   );
   return (
     <div>
       <BackLink />
       <div style={{ display: "flex", alignItems: "center", gap: theme.space.sm, marginBottom: theme.space.mdLg }}>
-        <span style={{ width: 9, height: 9, borderRadius: 5, background: connected ? theme.color.success : "#e0a63b" }} />
+        <span style={{ width: 9, height: 9, borderRadius: 5, background: connected ? theme.color.success : theme.color.warning }} />
         <span style={{ fontSize: theme.fontSize.smMd }}>{connected ? "Connected — ready to edit" : "Connecting to the project engine…"}</span>
         <span style={{ fontFamily: theme.font.mono, fontSize: theme.fontSize.xs, color: theme.color.textMuted, marginLeft: "auto" }}>{MCP_URL}</span>
       </div>

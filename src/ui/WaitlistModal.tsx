@@ -59,9 +59,9 @@ export function WaitlistModal() {
                 <input
                   type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@email.com"
                   onKeyDown={(e) => e.key === "Enter" && void submit()}
-                  style={{ flex: 1, background: theme.color.base, color: theme.color.textPrimary, border: `1px solid ${state.kind === "error" ? "#a34" : theme.color.borderSubtle}`, borderRadius: theme.radius.sm, padding: "9px 11px", fontSize: theme.fontSize.smMd, fontFamily: theme.font.ui }}
+                  style={{ flex: 1, background: theme.color.base, color: theme.color.textPrimary, border: `1px solid ${state.kind === "error" ? theme.color.errorBorder : theme.color.borderSubtle}`, borderRadius: theme.radius.sm, padding: "9px 11px", fontSize: theme.fontSize.smMd, fontFamily: theme.font.ui }}
                 />
-                <button onClick={() => void submit()} disabled={state.kind === "sending"} style={{ background: state.kind === "sending" ? theme.color.raised : theme.color.accent, color: state.kind === "sending" ? theme.color.textSecondary : "#1a1a1a", border: "none", borderRadius: theme.radius.sm, padding: "9px 16px", fontSize: theme.fontSize.smMd, fontWeight: 700, cursor: state.kind === "sending" ? "default" : "pointer", whiteSpace: "nowrap" }}>
+                <button onClick={() => void submit()} disabled={state.kind === "sending"} style={{ background: state.kind === "sending" ? theme.color.raised : theme.color.accent, color: state.kind === "sending" ? theme.color.textSecondary : theme.color.onAccent, border: "none", borderRadius: theme.radius.sm, padding: "9px 16px", fontSize: theme.fontSize.smMd, fontWeight: 700, cursor: state.kind === "sending" ? "default" : "pointer", whiteSpace: "nowrap" }}>
                   {state.kind === "sending" ? "…" : "Join waitlist"}
                 </button>
               </div>

@@ -54,7 +54,7 @@ export class ProjectBridge {
 
   private async fetchState(): Promise<{ version: number; timeline: unknown; media: unknown }> {
     const r = await fetch(`${BRIDGE_URL}/state`);
-    if (!r.ok) throw new Error(`state ${r.status}`);
+    if (!r.ok) throw new Error("Couldn't reach the project engine — is it still running?");
     return (await r.json()) as { version: number; timeline: unknown; media: unknown };
   }
 
@@ -108,7 +108,7 @@ export class ProjectBridge {
       headers: { "Content-Type": "application/octet-stream" },
       body: file,
     });
-    if (!r.ok) throw new Error((await r.json().catch(() => ({ error: `upload ${r.status}` }))).error ?? `upload ${r.status}`);
+    if (!r.ok) throw new Error((await r.json().catch(() => ({ error: "Couldn't import that file — is the project engine still running?" }))).error ?? "Couldn't import that file — is the project engine still running?");
     const { assetId } = (await r.json()) as { assetId: string };
     this.objectURLs.set(assetId, URL.createObjectURL(file));
     await this.poll(); // pull the new asset into the store now
@@ -125,9 +125,9 @@ export class ProjectBridge {
         params: { name: "import_media", arguments: { source: { path } } },
       }),
     });
-    if (!r.ok) throw new Error(`import ${r.status}`);
+    if (!r.ok) throw new Error("Couldn't reach the project engine — is it still running?");
     const json = (await r.json()) as { result?: { isError?: boolean; content: { text: string }[] } };
-    if (!json.result || json.result.isError) throw new Error(json.result?.content[0]?.text ?? "import failed");
+    if (!json.result || json.result.isError) throw new Error(json.result?.content[0]?.text ?? "Couldn't import that file.");
     const { assetId } = JSON.parse(json.result.content[0].text) as { assetId: string };
     await this.poll();
     return assetId;
@@ -140,10 +140,10 @@ export class ProjectBridge {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ jsonrpc: "2.0", id: this.rpcId++, method: "tools/call", params: { name, arguments: args } }),
     });
-    if (!r.ok) throw new Error(`${name} ${r.status}`);
+    if (!r.ok) throw new Error("Couldn't reach the project engine — is it still running?");
     const json = (await r.json()) as { result?: { isError?: boolean; content: { text: string }[] } };
     const text = json.result?.content[0]?.text ?? "";
-    if (!json.result || json.result.isError) throw new Error(text || `${name} failed`);
+    if (!json.result || json.result.isError) throw new Error(text || "That request didn't go through. Please try again.");
     await this.poll();
     try { return JSON.parse(text) as Record<string, unknown>; } catch { return { text }; }
   }
@@ -151,7 +151,7 @@ export class ProjectBridge {
   /** Save the hosted-generation BYOK config on the server (used by generate_video/image). */
   async saveGenConfig(cfg: { provider: string; apiKey: string; videoModel?: string; imageModel?: string }): Promise<void> {
     const r = await fetch(`${BRIDGE_URL}/gen-config`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(cfg) });
-    if (!r.ok) throw new Error((await r.json().catch(() => ({ error: `gen-config ${r.status}` }))).error ?? `gen-config ${r.status}`);
+    if (!r.ok) throw new Error((await r.json().catch(() => ({ error: "Couldn't save your generation settings — is the project engine still running?" }))).error ?? "Couldn't save your generation settings — is the project engine still running?");
   }
 
   async genConfigStatus(): Promise<{ provider: string; hasKey: boolean }> {
@@ -163,16 +163,16 @@ export class ProjectBridge {
   // --- gcp-ltx GPU lifecycle ---
   async saveGpuConfig(cfg: { project: string; zone: string; instance: string; port: number; token?: string }): Promise<void> {
     const r = await fetch(`${BRIDGE_URL}/gpu/config`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(cfg) });
-    if (!r.ok) throw new Error((await r.json().catch(() => ({ error: `gpu-config ${r.status}` }))).error ?? `gpu-config ${r.status}`);
+    if (!r.ok) throw new Error((await r.json().catch(() => ({ error: "Couldn't save the GPU settings — is the project engine still running?" }))).error ?? "Couldn't save the GPU settings — is the project engine still running?");
   }
   async gpuAction(action: "start" | "stop"): Promise<{ status: string; detail?: string; baseUrl?: string }> {
     const r = await fetch(`${BRIDGE_URL}/gpu/${action}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
-    if (!r.ok) throw new Error((await r.json().catch(() => ({ error: `gpu ${action} ${r.status}` }))).error ?? `gpu ${action} ${r.status}`);
+    if (!r.ok) throw new Error((await r.json().catch(() => ({ error: `Couldn't ${action} the GPU. Please try again.` }))).error ?? `Couldn't ${action} the GPU. Please try again.`);
     return (await r.json()) as { status: string; detail?: string; baseUrl?: string };
   }
   async gpuStatus(): Promise<{ status: string; detail?: string; baseUrl?: string }> {
     const r = await fetch(`${BRIDGE_URL}/gpu/status`);
-    if (!r.ok) return { status: "error", detail: `status ${r.status}` };
+    if (!r.ok) return { status: "error", detail: "Couldn't check GPU status right now." };
     return (await r.json()) as { status: string; detail?: string; baseUrl?: string };
   }
 }

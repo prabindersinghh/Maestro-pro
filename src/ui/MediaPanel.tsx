@@ -2,6 +2,7 @@ import { useRef, useState } from "react";
 import { store, useEditorVersion } from "../state/store";
 import { theme, clipColor, sectionLabelStyle } from "./theme";
 import type { ClipType } from "../model/enums";
+import { humanizeError } from "./errors";
 
 function fmtDuration(seconds: number): string {
   if (!seconds) return "—";
@@ -34,7 +35,7 @@ export function MediaPanel() {
   const importPaths = async (paths: string[]) => {
     for (const p of paths) {
       setBusy(p.split(/[/\\]/).pop() ?? p);
-      try { await store.bridge?.importPath(p); } catch (e) { setBusy(`Failed: ${e instanceof Error ? e.message : e}`); return; }
+      try { await store.bridge?.importPath(p); } catch (e) { setBusy(humanizeError(e, "Couldn't import that file")); return; }
     }
     setBusy(null);
   };
@@ -42,7 +43,7 @@ export function MediaPanel() {
   const importFiles = async (files: FileList | File[]) => {
     for (const f of files) {
       setBusy(f.name);
-      try { await store.bridge?.importFile(f); } catch (e) { setBusy(`Failed: ${e instanceof Error ? e.message : e}`); return; }
+      try { await store.bridge?.importFile(f); } catch (e) { setBusy(humanizeError(e, "Couldn't import that file")); return; }
     }
     setBusy(null);
   };
@@ -97,7 +98,7 @@ export function MediaPanel() {
       <div style={{ padding: theme.space.mdLg, flex: "1 1 auto" }}>
         {busy && <div style={{ fontSize: theme.fontSize.sm, color: theme.color.textSecondary, marginBottom: theme.space.smMd, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>Importing {busy}…</div>}
         {!store.bridge?.connected && (
-          <div style={{ fontSize: theme.fontSize.xs, color: "#e0a63b", marginBottom: theme.space.smMd, lineHeight: 1.4 }}>
+          <div style={{ fontSize: theme.fontSize.xs, color: theme.color.warning, marginBottom: theme.space.smMd, lineHeight: 1.4 }}>
             Connecting to the project engine… import resumes in a moment.
           </div>
         )}

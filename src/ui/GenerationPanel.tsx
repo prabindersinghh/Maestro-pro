@@ -115,7 +115,7 @@ export function GenerationPanel() {
 
           {status && <div style={{ fontSize: theme.fontSize.xs, color: statusColor, lineHeight: 1.5, background: theme.color.base, borderRadius: theme.radius.sm, padding: theme.space.md, border: `1px solid ${theme.color.borderSubtle}` }}>{status.text}</div>}
 
-          <button onClick={onGenerate} disabled={busy} style={{ background: busy ? theme.color.raised : theme.color.accent, color: busy ? theme.color.textSecondary : "#1a1a1a", border: "none", borderRadius: theme.radius.sm, padding: "10px", fontSize: theme.fontSize.md, fontWeight: 600, cursor: busy ? "default" : "pointer" }}>
+          <button onClick={onGenerate} disabled={busy} style={{ background: busy ? theme.color.raised : theme.color.accent, color: busy ? theme.color.textSecondary : theme.color.onAccent, border: "none", borderRadius: theme.radius.sm, padding: "10px", fontSize: theme.fontSize.md, fontWeight: 600, cursor: busy ? "default" : "pointer" }}>
             {busy ? "Generating…" : `✨ Generate ${kind}`}
           </button>
         </div>
@@ -131,7 +131,7 @@ function GpuControl() {
   const g = store.gpuState;
   const ready = g.status === "ready";
   const busy = g.status === "starting" || g.status === "stopping";
-  const color = g.status === "ready" ? "#9d9" : g.status === "error" ? "#e88" : busy ? "#e0a63b" : theme.color.textSecondary;
+  const color = g.status === "ready" ? "#9d9" : g.status === "error" ? "#e88" : busy ? theme.color.warning : theme.color.textSecondary;
   const field = (label: string, value: string, on: (v: string) => void, ph?: string) => (
     <label style={{ flex: 1, fontSize: theme.fontSize.xs, color: theme.color.textSecondary }}>{label}
       <input value={value} onChange={(e) => on(e.target.value)} placeholder={ph} style={{ display: "block", marginTop: 3, width: "100%", boxSizing: "border-box", background: theme.color.base, color: theme.color.textPrimary, border: `1px solid ${theme.color.borderSubtle}`, borderRadius: theme.radius.sm, padding: "5px 7px", fontSize: theme.fontSize.smMd, fontFamily: theme.font.mono }} />
