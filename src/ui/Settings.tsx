@@ -2,7 +2,7 @@
 // with three tabs: Connect AI (MCP endpoint + one-click copy of the Claude Code connect command +
 // live server status), Project (fps / resolution defaults), and Export (default codec / resolution).
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { store, useEditorVersion } from "../state/store";
 import { theme, sectionLabelStyle } from "./theme";
 import { BRIDGE_URL } from "../state/bridge";
@@ -11,7 +11,10 @@ import { humanizeError } from "./errors";
 const MCP_URL = `${BRIDGE_URL}/mcp`;
 const CONNECT_CMD = `claude mcp add --transport http kaestral ${MCP_URL}`;
 
-type Tab = "connect" | "project" | "export";
+// Fallback for the browser/dev (no Tauri) where @tauri-apps/api can't report a real app version.
+const FALLBACK_VERSION = "1.0.0";
+
+type Tab = "connect" | "project" | "export" | "about";
 
 export function Settings() {
   useEditorVersion();
@@ -34,7 +37,7 @@ export function Settings() {
         </div>
 
         <div style={{ display: "flex", gap: theme.space.xs, padding: `${theme.space.smMd}px ${theme.space.lg}px 0`, borderBottom: `1px solid ${theme.color.borderPrimary}` }}>
-          {(["connect", "project", "export"] as Tab[]).map((t) => (
+          {(["connect", "project", "export", "about"] as Tab[]).map((t) => (
             <button
               key={t}
               onClick={() => setTab(t)}
@@ -44,7 +47,7 @@ export function Settings() {
                 borderBottom: `2px solid ${tab === t ? theme.color.accent : "transparent"}`,
               }}
             >
-              {t === "connect" ? "Connect AI" : t === "project" ? "Project" : "Export"}
+              {t === "connect" ? "Connect AI" : t === "project" ? "Project" : t === "export" ? "Export" : "About"}
             </button>
           ))}
         </div>
@@ -53,6 +56,7 @@ export function Settings() {
           {tab === "connect" && <ConnectTab connected={!!connected} />}
           {tab === "project" && <ProjectTab />}
           {tab === "export" && <ExportTab />}
+          {tab === "about" && <AboutTab />}
         </div>
       </div>
     </div>
@@ -235,6 +239,77 @@ function ProjectTab() {
         </select>
       </Field>
       <div style={{ fontSize: theme.fontSize.xs, color: theme.color.textMuted }}>Applies to the preview canvas and the exported video.</div>
+    </div>
+  );
+}
+
+function AboutTab() {
+  const inTauri = "__TAURI_INTERNALS__" in globalThis;
+  const [version, setVersion] = useState(FALLBACK_VERSION);
+  const [checking, setChecking] = useState(false);
+  const [status, setStatus] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!inTauri) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const { getVersion } = await import("@tauri-apps/api/app");
+        const v = await getVersion();
+        if (!cancelled) setVersion(v);
+      } catch {
+        // Stay on the fallback constant — non-fatal, just cosmetic.
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [inTauri]);
+
+  const checkForUpdates = async () => {
+    setChecking(true);
+    setStatus("Checking for updates…");
+    try {
+      const { check } = await import("@tauri-apps/plugin-updater");
+      const update = await check();
+      if (!update) {
+        setStatus("You're up to date.");
+        return;
+      }
+      setStatus(`Update ${update.version} found — downloading…`);
+      await update.downloadAndInstall();
+      setStatus("Update installed — restarting…");
+      const { relaunch } = await import("@tauri-apps/plugin-process");
+      await relaunch();
+    } catch (e) {
+      setStatus(humanizeError(e, "Couldn't check for updates"));
+    } finally {
+      setChecking(false);
+    }
+  };
+
+  return (
+    <div>
+      <div style={{ ...sectionLabelStyle, marginBottom: theme.space.smMd }}>About</div>
+      <div style={{ fontSize: theme.fontSize.lg, fontWeight: 700, marginBottom: 4 }}>Kaestral {version}</div>
+      <div style={{ fontSize: theme.fontSize.smMd, color: theme.color.textSecondary, lineHeight: 1.6, marginBottom: theme.space.mdLg }}>
+        The AI-operated video editor for Windows.
+      </div>
+      {inTauri ? (
+        <button
+          onClick={checkForUpdates}
+          disabled={checking}
+          style={{
+            background: checking ? theme.color.raised : theme.color.accent,
+            color: checking ? theme.color.textMuted : theme.color.onAccent,
+            border: "none", borderRadius: theme.radius.sm, padding: "8px 14px",
+            fontSize: theme.fontSize.smMd, fontWeight: 600, cursor: checking ? "default" : "pointer",
+          }}
+        >
+          {checking ? "Checking…" : "Check for updates"}
+        </button>
+      ) : (
+        <div style={{ fontSize: theme.fontSize.xs, color: theme.color.textMuted }}>Updates are available in the desktop app.</div>
+      )}
+      {status && <div style={{ marginTop: theme.space.sm, fontSize: theme.fontSize.xs, color: theme.color.textSecondary, lineHeight: 1.5 }}>{status}</div>}
     </div>
   );
 }

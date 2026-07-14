@@ -1,11 +1,11 @@
 {
   "name": "kaestral",
-  "version": "0.0.1",
+  "version": "1.0.0",
   "type": "module",
   "description": "The AI-operated video editor for Windows. You describe the edit, it makes it — cut, caption, and edit by prompt over MCP. A GPLv3 port of Palmier Pro.",
   "license": "GPL-3.0-or-later",
-  "homepage": "https://github.com/prabindersinghh/kaestral",
-  "repository": { "type": "git", "url": "https://github.com/prabindersinghh/kaestral.git" },
+  "homepage": "https://github.com/prabindersinghh/Kaestral-pro",
+  "repository": { "type": "git", "url": "https://github.com/prabindersinghh/Kaestral-pro.git" },
   "keywords": ["video-editor", "mcp", "claude", "ai", "ffmpeg", "windows", "video", "transcription", "whisper"],
   "bin": { "kaestral": "bin/kaestral.mjs" },
   "files": ["bin/", "dist-server/", "skills/", "public/", "vendor/whisper/", "remotion/src/", "remotion/package.json", "remotion/render.mjs", "README.md", "NOTICE.md", "LICENSE"],
@@ -25,6 +25,8 @@
     "@modelcontextprotocol/sdk": "^1.29.0",
     "@napi-rs/canvas": "^1.0.2",
     "@tauri-apps/plugin-dialog": "^2.7.1",
+    "@tauri-apps/plugin-process": "^2.3.1",
+    "@tauri-apps/plugin-updater": "^2.10.1",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
   },

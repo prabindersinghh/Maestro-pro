@@ -1,13 +1,14 @@
 {
   "$schema": "https://schema.tauri.app/capabilities/2",
   "identifier": "default",
-  "description": "Main window: core APIs (events for drag-drop), file dialogs, fs plugin. Explicit window:allow-close/allow-destroy for the unsaved-changes close guard (Editor.tsx onCloseRequested).",
+  "description": "Main window: core APIs (events for drag-drop), file dialogs, fs plugin, updater. Explicit window:allow-close/allow-destroy for the unsaved-changes close guard (Editor.tsx onCloseRequested).",
   "windows": ["main", "*"],
   "permissions": [
     "core:default",
     "core:window:allow-close",
     "core:window:allow-destroy",
     "dialog:default",
-    "fs:default"
+    "fs:default",
+    "updater:default"
   ]
 }

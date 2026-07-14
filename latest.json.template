@@ -1,0 +1,14 @@
+// This is a TEMPLATE showing the exact shape Tauri 2's updater expects for latest.json — it is
+// not valid JSON itself (comments aren't allowed in the real file). Generate the real latest.json
+// with `node scripts/make-latest-json.mjs <version> <path-to-.sig-file>` — see docs/UPDATER-SETUP.md.
+{
+  "version": "1.0.0",
+  "notes": "See release notes on GitHub.",
+  "pub_date": "2026-07-15T00:00:00.000Z",
+  "platforms": {
+    "windows-x86_64": {
+      "signature": "<contents of the .sig file produced alongside the NSIS installer>",
+      "url": "https://github.com/prabindersinghh/Kaestral-pro/releases/download/v1.0.0/Kaestral_1.0.0_x64-setup.exe"
+    }
+  }
+}
