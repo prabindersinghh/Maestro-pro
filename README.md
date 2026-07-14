@@ -44,7 +44,8 @@ rendered onto your timeline. Launch videos, demos, and ads, without hiring an ed
 - **Editing playbooks (skills)** — viral-reel, beat-sync, creative-director, captions, b-roll,
   platform-delivery, promo/ad. The AI reads them and follows pro workflows.
 
-**48+ MCP tools.** A full editor the AI operates like a pair of hands.
+**50 MCP tools.** A full editor the AI operates like a pair of hands. See
+[docs/MCP-TOOLS.md](./docs/MCP-TOOLS.md) for the full list.
 
 ---
 
@@ -52,7 +53,7 @@ rendered onto your timeline. Launch videos, demos, and ads, without hiring an ed
 
 On-device **whisper** for word-level transcription · **frame vision** so the model sees the footage ·
 **beat/silence detection** for rhythmic cuts · **palette extraction** for on-brand color · **Remotion**
-motion graphics · an **MCP server** exposing 48+ tools · a full multi-track timeline · **H.264/H.265/
+motion graphics · an **MCP server** exposing 50 tools · a full multi-track timeline · **H.264/H.265/
 ProRes** render + **Premiere/Resolve** interchange export. No cloud required for any of it.
 
 ## Pro (waitlist)
@@ -66,13 +67,23 @@ images, and B-roll inside Kaestral. [Join the waitlist](#) from the app's **✨ 
 Kaestral is designed to be adopted **MCP-first** — the fastest way in is to point the Claude Code you
 already have at it.
 
-### 1. MCP server (primary — one line)
+### 1. MCP server (primary — one command)
 ```bash
-npx kaestral            # starts the local editor engine on http://127.0.0.1:19789/mcp
+claude mcp add kaestral -- npx kaestral
+claude
+```
+That's it — Claude Code spawns `npx kaestral` itself and talks to it over stdio, so there's no
+separate server process to start or port to remember.
+
+Then just ask: *"get_timeline, then cut the silent parts of demo.mp4, add captions, and export it."*
+
+Prefer running the engine yourself (e.g. to keep it up across multiple `claude` sessions)? Use the
+HTTP transport instead:
+```bash
+npx kaestral --http     # starts the local editor engine on http://127.0.0.1:19789/mcp
 claude mcp add --transport http kaestral http://127.0.0.1:19789/mcp
 claude
 ```
-Then just ask: *"get_timeline, then cut the silent parts of demo.mp4, add captions, and export it."*
 
 ### 2. Windows installer
 Download **Kaestral_x64-setup.exe** from [Releases](https://github.com/prabindersinghh/kaestral/releases).

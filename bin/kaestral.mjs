@@ -1,9 +1,13 @@
 #!/usr/bin/env node
-// `npx kaestral` — starts the Kaestral editor engine (the MCP server) so Claude Code can drive it:
+// `npx kaestral` — starts the Kaestral editor engine (the MCP server) so Claude Code can drive it.
+// Default transport is stdio (one-step, zero-config):
 //   npx kaestral
+//   claude mcp add kaestral -- npx kaestral
+// HTTP transport (used by the desktop app; also available standalone):
+//   npx kaestral --http
 //   claude mcp add --transport http kaestral http://127.0.0.1:19789/mcp
 // Requires FFmpeg + ffprobe on PATH. The whisper model (~142 MB) downloads on first transcription.
-// Optionally pass a .palmier project path to load it.
+// Optionally pass a .palmier project path to load it (works with either transport).
 
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
@@ -33,7 +37,14 @@ const env = {
   // FFmpeg/ffprobe are expected on PATH; override with MAESTRO_FFMPEG / MAESTRO_FFPROBE if needed.
 };
 
-console.error("Kaestral engine starting… connect with:\n  claude mcp add --transport http kaestral http://127.0.0.1:19789/mcp\n");
+// All human-readable hints go to stderr — in stdio mode (the default) stdout is the JSON-RPC
+// channel and must stay clean. The child (server.cjs) follows the same rule in stdio mode.
+const httpMode = process.argv.slice(2).includes("--http");
+if (httpMode) {
+  console.error("Kaestral engine starting (HTTP)… connect with:\n  claude mcp add --transport http kaestral http://127.0.0.1:19789/mcp\n");
+} else {
+  console.error("Kaestral engine starting (stdio)… connect with:\n  claude mcp add kaestral -- npx kaestral\n");
+}
 const child = spawn(process.execPath, [server, ...process.argv.slice(2)], { stdio: "inherit", env });
 child.on("exit", (code) => process.exit(code ?? 0));
 process.on("SIGINT", () => child.kill("SIGINT"));

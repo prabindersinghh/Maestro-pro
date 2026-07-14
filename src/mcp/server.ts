@@ -42,7 +42,7 @@ const SERVER_INSTRUCTIONS =
   "For any motion-graphics / film / title-sequence work (compose_motion), read_skill('art-direction') FIRST — " +
   "it teaches how to art-direct at a premium level (decision process, optical composition, rhythm, restraint, the physics of premium motion) so the result reads as designed, not templated.";
 
-interface JsonRpcRequest {
+export interface JsonRpcRequest {
   jsonrpc?: string;
   id?: string | number | null;
   method: string;
@@ -279,6 +279,15 @@ export class McpServer {
     }
     res.writeHead(200, { "Content-Type": type, "Content-Length": size, "Accept-Ranges": "bytes", ...CORS });
     createReadStream(path).pipe(res);
+  }
+
+  /**
+   * Handle one JSON-RPC message and return a JSON-RPC response, or null for notifications.
+   * Public entry point shared by both transports: the HTTP handler above and the stdio loop
+   * (stdio.ts) both funnel through this so tool-handling logic is never duplicated.
+   */
+  async handleMessage(msg: JsonRpcRequest): Promise<unknown | null> {
+    return this.dispatch(msg);
   }
 
   /** Returns a JSON-RPC response, or null for notifications. */
