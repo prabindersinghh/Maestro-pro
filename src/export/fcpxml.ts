@@ -152,7 +152,7 @@ class Builder {
   }
 
   private libraryNode(clips: EmittableClip[]): Node {
-    return n("library", [], [n("event", [["name", "Palmier Export"]], [this.projectNode(clips)])]);
+    return n("library", [], [n("event", [["name", "Kaestral Export"]], [this.projectNode(clips)])]);
   }
 
   private projectNode(clips: EmittableClip[]): Node {
