@@ -202,6 +202,36 @@ If your draft has any of these, it is not yet premium. Fix it before you render.
 
 ---
 
+## 9.5 Brand discipline & showing the product (do not get these wrong)
+
+Two mistakes that instantly wreck a launch film — both easy to avoid:
+
+- **The product is named KAESTRAL. Never write any other name.** Not "Maestro", not the upstream
+  project's name, not a placeholder. Every title, wordmark, tagline, and mocked UI label says
+  **Kaestral**. A single wrong brand name in a launch film is fatal — check every text layer.
+- **To "show the product", use the REAL bundled screenshot — do NOT hand-build a fake editor UI.**
+  There is a real, on-brand Kaestral editor screenshot bundled with the engine. Show it with the
+  `screenMock` element and `props.src: "/kaestral-ui.png"` (a bundled asset path) — it renders the
+  actual UI inside window chrome, bright and correct. Do **not** assemble a fake editor out of
+  shapes/text with invented labels: it comes out dark, tiny, low-contrast, and you will mistype the
+  brand. Example beat:
+  ```json
+  { "element": "screenMock",
+    "props": { "src": "/kaestral-ui.png", "url": "kaestral", "width": 0.62 },
+    "position": { "x": 0.5, "y": 0.5, "snap": false },
+    "enter": { "anim": "spring" } }
+  ```
+  Give the screenshot room (width ~0.6 of the frame) and a slow camera push-in so it reads as the hero
+  of that beat, not a thumbnail. If you genuinely need a UI shot that doesn't exist as an asset, prefer
+  a clean abstract representation (a `timeline` element + a `text` label) over a mislabeled mockup.
+
+- **Legibility over darkness.** The palette is near-black by design, but the *content* must read
+  clearly: display text at full ink (`role:"display"`), one bright green accent (`role:"accent"` /
+  `#1fce7e`) on the payload, and never let the beat's glow/grid wash out the type. If a frame looks
+  murky, the fix is brighter/larger content, not a brighter background.
+
+---
+
 ## 10. Tool-to-craft mapping — which field expresses which intent
 
 You express the craft above through these `compose_motion` / `SceneSpec` fields. Reach for the field *because of the intent*, not the other way around:

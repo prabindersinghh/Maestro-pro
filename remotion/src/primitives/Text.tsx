@@ -129,6 +129,20 @@ export const Text: React.FC<PrimitiveProps> = ({ props, frame, fps, width, heigh
   const baseTranslateX = anchor === "left" ? "0" : anchor === "right" ? "-100%" : "-50%";
   const textAlign = anchor === "left" ? "left" : anchor === "right" ? "right" : "center";
 
+  // FIX (display overflow): a long display line at a large fontSize used to run off-frame because the
+  // text was a single non-wrapping line with no width bound (whiteSpace:"pre"). Bound the text to the
+  // horizontal room it actually has before the frame edge — for center anchor that's twice the smaller
+  // side gap; for left/right it's the room on the growing side — minus an 8% safe-area margin. Combined
+  // with pre-wrap below, long lines now WRAP onto multiple lines and stay on-screen at any style.size,
+  // instead of clipping. Authored "\n" line breaks are still honored (pre-wrap), and short lines that
+  // already fit are unaffected.
+  const safe = 0.92; // keep 8% total off the frame edge
+  const maxWidthPx = Math.round(
+    (anchor === "left" ? (1 - position.x)
+      : anchor === "right" ? position.x
+      : 2 * Math.min(position.x, 1 - position.x)) * width * safe,
+  );
+
   // TASK 6b3 — wordStagger renders one span PER WORD instead of a single text node, each with its
   // own independent spring-driven opacity/translateY. The OUTER div (below) still owns anchor/
   // position/font/color/letterSpacing exactly like every other branch — this only lays the words
@@ -157,8 +171,11 @@ export const Text: React.FC<PrimitiveProps> = ({ props, frame, fps, width, heigh
         color,
         letterSpacing: -1.5,
         textAlign,
-        whiteSpace: "pre",
-        ...(words ? { display: "flex", flexWrap: "nowrap" as const } : {}),
+        lineHeight: 1.1,
+        maxWidth: maxWidthPx,
+        whiteSpace: "pre-wrap",
+        overflowWrap: "break-word",
+        ...(words ? { display: "flex", flexWrap: "wrap" as const, justifyContent: anchor === "left" ? "flex-start" : anchor === "right" ? "flex-end" : "center", columnGap: "0.28em" } : {}),
       }}
     >
       {words

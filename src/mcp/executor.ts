@@ -466,6 +466,14 @@ export class McpExecutor {
     paths.add(join(publicDir(), "sample-image.png"));
     paths.add(join(publicDir(), "sample-video.mp4"));
     paths.add(join(publicDir(), "sample-audio.m4a"));
+    // The real Kaestral editor screenshot — so a launch/demo film can "show the product" via a
+    // screenMock with the ACTUAL on-brand UI instead of a hand-built fake (which comes out dark and
+    // risks a mislabeled brand name). See skills/art-direction/SKILL.md §9.5. Both the absolute path
+    // and the memorable "/kaestral-ui.png" short form are allowed (resolveRenderMediaPath maps the
+    // leading-slash form to <publicDir>/kaestral-ui.png at render time) so the LLM can use the short
+    // path it's told about in the tool description without knowing the machine's absolute publicDir.
+    paths.add(join(publicDir(), "kaestral-ui.png"));
+    paths.add("/kaestral-ui.png");
     return [...paths];
   }
 
@@ -474,9 +482,29 @@ export class McpExecutor {
   // error returns immediately (no render attempted). Only if a REAL render attempt throws do we fall
   // back to a deterministic template — and that result is always labelled fallback:true with a reason,
   // never presented as if it were the bespoke generative render.
+  // Rewrite every media-layer `props.src` in a validated SceneSpec from the memorable/served form the
+  // LLM uses (a "/kaestral-ui.png" bundled path, or a project-relative one) to the ABSOLUTE filesystem
+  // path the renderer needs — render.mjs inlines an asset by `readFileSync(src)`, so a bare "/foo.png"
+  // never loads and the render fails (the exact bug behind the tester's dark, brandless "screenshot").
+  // Runs after validation, mutating a deep copy so the allowlist check still saw the original string.
+  private resolveSpecMediaSrcs(spec: SceneSpec): SceneSpec {
+    const out = JSON.parse(JSON.stringify(spec)) as SceneSpec;
+    for (const beat of out.beats) {
+      for (const layer of beat.layers) {
+        const src = layer.props?.src;
+        if (typeof src !== "string" || src === "" || src.startsWith("data:") || /^https?:\/\//i.test(src)) continue;
+        // already an existing absolute path? leave it. Otherwise resolve served/project forms.
+        const abs = resolveRenderMediaPath({ kind: "external", absolutePath: src }, this.projectDir ?? ".", publicDir());
+        if (abs) layer.props.src = abs;
+      }
+    }
+    return out;
+  }
+
   private async composeMotion(a: Args): Promise<ToolResult> {
     const v = validateSceneSpec((a as any).spec, { allowedMediaPaths: this.knownMediaPaths() });
     if (!v.ok) return err(`compose_motion: ${v.error}`);
+    v.spec = this.resolveSpecMediaSrcs(v.spec);
 
     const place = aBool(a, "place") !== false;
     const dir = join(dataDir(), "generated");
