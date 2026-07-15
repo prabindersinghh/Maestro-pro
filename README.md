@@ -2,7 +2,7 @@
   <img src="./docs/assets/kaestral-banner.png" alt="Kaestral" width="440">
 </p>
 
-<p align="center"><strong>The AI-operated video editor for Windows. You describe the edit. It makes it.</strong></p>
+<p align="center"><strong>The AI-operated video editor for Windows. You describe the edit. It makes it. Kaestral watches your footage, hears every word, and cuts.</strong></p>
 
 <p align="center"><strong>Windows 10 / 11</strong></p>
 
