@@ -1,14 +1,41 @@
 {
   "name": "kaestral",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "type": "module",
   "description": "The AI-operated video editor for Windows. You describe the edit, it makes it — cut, caption, and edit by prompt over MCP. A GPLv3-licensed, Windows-native AI video editor.",
   "license": "GPL-3.0-or-later",
   "homepage": "https://github.com/prabindersinghh/Kaestral-pro",
-  "repository": { "type": "git", "url": "https://github.com/prabindersinghh/Kaestral-pro.git" },
-  "keywords": ["video-editor", "mcp", "claude", "ai", "ffmpeg", "windows", "video", "transcription", "whisper"],
-  "bin": { "kaestral": "bin/kaestral.mjs" },
-  "files": ["bin/", "dist-server/", "skills/", "public/", "vendor/whisper/", "remotion/src/", "remotion/package.json", "remotion/render.mjs", "README.md", "NOTICE.md", "LICENSE"],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/prabindersinghh/Kaestral-pro.git"
+  },
+  "keywords": [
+    "video-editor",
+    "mcp",
+    "claude",
+    "ai",
+    "ffmpeg",
+    "windows",
+    "video",
+    "transcription",
+    "whisper"
+  ],
+  "bin": {
+    "kaestral": "bin/kaestral.mjs"
+  },
+  "files": [
+    "bin/",
+    "dist-server/",
+    "skills/",
+    "public/",
+    "vendor/whisper/",
+    "remotion/src/",
+    "remotion/package.json",
+    "remotion/render.mjs",
+    "README.md",
+    "NOTICE.md",
+    "LICENSE"
+  ],
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
